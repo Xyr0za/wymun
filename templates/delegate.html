@@ -1,38 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delegate Input</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Socket.IO client library -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body>
-    <h1>Delegate Input Form</h1>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
 
-    <form id="delegate-form">
-        <label for="message">Your Update:</label><br>
-        <textarea id="message" name="message" rows="4" cols="50"></textarea><br><br>
-        <button type="submit">Send Live Update</button>
-    </form>
-    <p id="confirmation"></p>
+    <div class="bg-white p-8 md:p-10 rounded-xl shadow-xl w-full max-w-lg">
+        <h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">
+            Delegate Live Input
+        </h1>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script type="text/javascript">
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        <p class="mb-4 text-sm text-gray-500">
+            Type your message and click "Send Update" to broadcast it instantly to all connected dashboards.
+        </p>
 
-        socket.on('connect', function() {
-            console.log('Delegate connected to server');
+        <textarea id="message-input" rows="4"
+            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 resize-none mb-6"
+            placeholder="Enter live update message here..."></textarea>
+
+        <button onclick="sendMessage()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 transform active:scale-95">
+            Send Live Update
+        </button>
+
+        <div id="feedback-message" class="mt-4 text-center text-sm font-medium h-5"></div>
+
+    </div>
+
+    <script>
+        // Connect to the SocketIO server.
+        const socket = io();
+        const inputElement = document.getElementById('message-input');
+        const feedbackElement = document.getElementById('feedback-message');
+
+        socket.on('connect', () => {
+            console.log('Delegate connected to server.');
         });
 
-        document.getElementById('delegate-form').onsubmit = function(event) {
-            event.preventDefault(); // Stop the form from submitting normally
-            var messageInput = document.getElementById('message');
-            var message = messageInput.value;
+        function sendMessage() {
+            const message = inputElement.value.trim();
+            if (message === "") {
+                feedbackElement.textContent = "Please enter a message.";
+                feedbackElement.classList.remove('text-green-500');
+                feedbackElement.classList.add('text-red-500');
+                return;
+            }
 
-            // Emit the custom event 'delegate_message' to the server
+            // Emit the 'delegate_message' event with the payload
             socket.emit('delegate_message', { message: message });
 
-            document.getElementById('confirmation').innerHTML = "Update sent: " + message;
-            messageInput.value = ''; // Clear the text area
-            return false;
-        };
+            // Provide visual feedback
+            feedbackElement.textContent = "Message sent successfully!";
+            feedbackElement.classList.remove('text-red-500');
+            feedbackElement.classList.add('text-green-500');
+            inputElement.value = ''; // Clear input after sending
+
+            // Clear feedback after a short delay
+            setTimeout(() => {
+                feedbackElement.textContent = '';
+            }, 3000);
+        }
     </script>
 </body>
 </html>

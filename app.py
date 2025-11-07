@@ -1,12 +1,16 @@
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit, join_room
+import eventlet
+# Patch standard Python libraries to be cooperative (non-blocking)
+eventlet.monkey_patch()
 
-# Use 'eventlet' or 'gevent' for production deployment on Render
-# if you want to run multiple workers, though for a basic app,
-# the default Werkzeug server with eventlet installed is a start.
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit
+
+# Use 'eventlet' for production deployment
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'super_secret'  # Important for sessions/security
-socketio = SocketIO(app, cors_allowed_origins="*")  # Use cors_allowed_origins for testing
+# IMPORTANT: Use a secure secret key in production
+app.config['SECRET_KEY'] = 'super_secret'
+# Allow all origins for testing/development
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 # Variable to hold the text to display on the dashboard
 live_text = "Waiting for delegate input..."
@@ -33,7 +37,7 @@ def delegate():
 def handle_connect():
     """Handler for new client connections."""
     print('Client connected:', request.sid)
-    # Automatically send the current status to a newly connected dashboard
+    # Automatically send the current status to a newly connected client
     emit('update_text', {'data': live_text}, room=request.sid)
 
 
@@ -54,30 +58,17 @@ def handle_delegate_message(data):
     emit('update_text', {'data': live_text}, broadcast=True)
 
 
-# --- POST Request Alternative (Less Recommended for Live Update) ---
-
-@app.route('/post-update', methods=['POST'])
-def handle_post_update():
-    """
-    Handles a POST request from the /delegate page (as an alternative).
-    The /delegate page would submit a form to this route.
-    """
-    global live_text
-    new_message = request.form.get('message', 'No message provided via POST')
-    live_text = f"**POST Update**: {new_message}"
-
-    print(f"Received POST message: {new_message}")
-
-    # With POST, you must STILL use SocketIO to broadcast the change
-    # or the dashboard won't update automatically.
-    socketio.emit('update_text', {'data': live_text}, broadcast=True)
-
-    # Redirect back to the delegate page or to a confirmation page
-    return "Message sent!", 200
-
+# --- POST Request Alternative (Removed/Ignored for this WS-focused setup) ---
+# NOTE: The POST route from your original code is kept as a comment for context,
+# but the primary live communication happens via the 'delegate_message' event.
+# @app.route('/post-update', methods=['POST'])
+# def handle_post_update():
+#     ...
 
 # --- Server Start ---
 
 if __name__ == '__main__':
     # Use socketio.run instead of app.run to include the WebSocket server
-    socketio.run(app, debug=True)
+    print("Server running. Access dashboard at http://127.0.0.1:5000/dashboard")
+    print("Access delegate input at http://127.0.0.1:5000/delegate")
+    socketio.run(app, debug=True, port=5000)
