@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Delegate Input</title>
+</head>
+<body>
+    <h1>Delegate Input Form</h1>
+
+    <form id="delegate-form">
+        <label for="message">Your Update:</label><br>
+        <textarea id="message" name="message" rows="4" cols="50"></textarea><br><br>
+        <button type="submit">Send Live Update</button>
+    </form>
+    <p id="confirmation"></p>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script type="text/javascript">
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('connect', function() {
+            console.log('Delegate connected to server');
+        });
+
+        document.getElementById('delegate-form').onsubmit = function(event) {
+            event.preventDefault(); // Stop the form from submitting normally
+            var messageInput = document.getElementById('message');
+            var message = messageInput.value;
+
+            // Emit the custom event 'delegate_message' to the server
+            socket.emit('delegate_message', { message: message });
+
+            document.getElementById('confirmation').innerHTML = "Update sent: " + message;
+            messageInput.value = ''; // Clear the text area
+            return false;
+        };
+    </script>
+</body>
+</html>

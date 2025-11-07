@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>MUN Dashboard</title>
+</head>
+<body>
+    <h1>Model UN Live Dashboard</h1>
+    <p>Current Status:</p>
+    <div id="live-display">
+        {{ current_text }}
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script type="text/javascript">
+        // Connect to the server
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        // Listen for the 'update_text' event from the server
+        socket.on('update_text', function(msg) {
+            document.getElementById('live-display').innerHTML = msg.data;
+            console.log('Received update: ' + msg.data);
+        });
+
+        socket.on('connect', function() {
+            console.log('Connected to server via WebSocket');
+        });
+    </script>
+</body>
+</html>
