@@ -1,9 +1,11 @@
 import eventlet
+
 # Patch standard Python libraries to be cooperative (non-blocking)
 eventlet.monkey_patch()
 
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
+from datetime import datetime
 
 # Use 'eventlet' for production deployment
 app = Flask(__name__)
@@ -12,8 +14,36 @@ app.config['SECRET_KEY'] = 'super_secret'
 # Allow all origins for testing/development
 socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
-# Variable to hold the text to display on the dashboard
-live_text = "Waiting for delegate input..."
+# Variable to hold the stream of updates. Each entry is a dict.
+# e.g., [{'id': 'USA', 'message': 'Update 1', 'timestamp': '15:30:00'}, ...]
+update_stream = []
+
+
+# --- Helper Function to Render Stream ---
+
+def render_update_stream():
+    """Renders the entire update_stream list into a readable HTML string."""
+    # We display the newest update at the top (reverse the list)
+    html_content = ""
+    if not update_stream:
+        return "<p class='text-gray-500 italic'>No updates yet...</p>"
+
+    for update in reversed(update_stream):
+        timestamp = update['timestamp']
+        delegate_id = update['id']
+        message = update['message']
+
+        # Use Tailwind classes for styling each update in the stream
+        html_content += f"""
+        <div class="p-3 bg-white rounded-lg shadow-md mb-3 border-l-4 border-blue-500 text-left">
+            <p class="text-sm font-semibold text-gray-500">
+                <span class="text-blue-700 font-bold mr-2">[{delegate_id}]</span> 
+                <span class="float-right text-xs font-normal text-gray-400">{timestamp}</span>
+            </p>
+            <p class="text-gray-800 mt-1 whitespace-pre-wrap">{message}</p>
+        </div>
+        """
+    return html_content
 
 
 # --- Routes ---
@@ -21,8 +51,9 @@ live_text = "Waiting for delegate input..."
 @app.route('/dashboard')
 def dashboard():
     """Main dashboard page - displays live updates."""
-    # Pass the current text to the template on initial load
-    return render_template('dashboard.html', current_text=live_text)
+    # Pass the initial rendered stream to the template
+    initial_content = render_update_stream()
+    return render_template('dashboard.html', initial_content=initial_content)
 
 
 @app.route('/delegate')
@@ -37,33 +68,39 @@ def delegate():
 def handle_connect():
     """Handler for new client connections."""
     print('Client connected:', request.sid)
-    # Automatically send the current status to a newly connected client
-    emit('update_text', {'data': live_text}, room=request.sid)
+    # Send the ENTIRE current stream to a newly connected client
+    current_stream_html = render_update_stream()
+    emit('stream_update', {'data': current_stream_html}, room=request.sid)
 
 
 @socketio.on('delegate_message')
 def handle_delegate_message(data):
     """
     Handles a message event from the /delegate page (via WebSocket).
-    data should contain a 'message' key.
+    data should contain 'delegate_id' and 'message' keys.
     """
-    global live_text
+    global update_stream
+
+    delegate_id = data.get('delegate_id', 'UNKNOWN')
     new_message = data.get('message', 'No message provided')
-    live_text = f"**Delegate Update**: {new_message}"
+    timestamp = datetime.now().strftime('%H:%M:%S')
 
-    print(f"Received WebSocket message: {new_message}")
+    new_update = {
+        'id': delegate_id.upper(),  # Standardize ID
+        'message': new_message,
+        'timestamp': timestamp
+    }
 
-    # Send the update to ALL connected clients (i.e., the dashboard page)
-    # The client-side JS will listen for the 'update_text' event.
-    emit('update_text', {'data': live_text}, broadcast=True)
+    # Add the new update to the stream list
+    update_stream.append(new_update)
 
+    print(f"[{timestamp}] New Update from {delegate_id}: {new_message}")
 
-# --- POST Request Alternative (Removed/Ignored for this WS-focused setup) ---
-# NOTE: The POST route from your original code is kept as a comment for context,
-# but the primary live communication happens via the 'delegate_message' event.
-# @app.route('/post-update', methods=['POST'])
-# def handle_post_update():
-#     ...
+    # Send the ENTIRE updated stream to ALL connected clients
+    # The client-side JS will overwrite its current content with the new stream.
+    updated_stream_html = render_update_stream()
+    emit('stream_update', {'data': updated_stream_html}, broadcast=True)
+
 
 # --- Server Start ---
 

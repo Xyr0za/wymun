@@ -3,43 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Event Dashboard</title>
+    <title>Live Event Dashboard Stream</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Socket.IO client library -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+<body class="bg-gray-100 min-h-screen p-4">
 
-    <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-4xl text-center">
-        <h1 class="text-4xl font-extrabold text-indigo-700 mb-6 tracking-tight">
-            Live Event Dashboard
+    <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-4xl mx-auto">
+        <h1 class="text-4xl font-extrabold text-indigo-700 mb-6 tracking-tight text-center">
+            Live Update Stream ⚡
         </h1>
 
-        <div class="mb-8 p-4 bg-indigo-50 rounded-lg">
+        <div class="mb-8 p-4 bg-indigo-50 rounded-lg text-center">
             <p class="text-sm font-semibold text-indigo-500">Status: <span id="connection-status" class="text-red-500">Connecting...</span></p>
         </div>
 
-        <div class="border-4 border-indigo-200 border-dashed p-6 md:p-10 rounded-xl bg-indigo-50">
-            <h2 class="text-xl md:text-2xl font-bold text-gray-700 mb-4">Current Live Update</h2>
-            <div id="live-data" class="text-3xl md:text-5xl font-extrabold text-gray-900 bg-white p-6 rounded-lg shadow-inner min-h-[150px] flex items-center justify-center whitespace-pre-wrap">
-                <!-- Initial text from Flask context, displayed on first load -->
-                {{ current_text }}
+        <div class="border-4 border-indigo-200 border-dashed p-4 md:p-6 rounded-xl bg-gray-50 max-h-[70vh] overflow-y-auto">
+            <h2 class="text-xl md:text-2xl font-bold text-gray-700 mb-4 text-center sticky top-0 bg-gray-50 py-2">
+                All Delegate Updates
+            </h2>
+            <div id="update-stream" class="flex flex-col">
+                {{ initial_content }}
             </div>
         </div>
 
-        <p class="mt-8 text-gray-500">
+        <p class="mt-8 text-gray-500 text-center">
             Open the <a href="/delegate" class="text-indigo-600 hover:text-indigo-800 font-medium">Delegate Input Page</a> in another window to send updates.
         </p>
     </div>
 
     <script>
-        // Connect to the SocketIO server. No path needed if running locally.
+        // Connect to the SocketIO server.
         const socket = io();
-        const liveDataElement = document.getElementById('live-data');
+        const streamElement = document.getElementById('update-stream');
         const statusElement = document.getElementById('connection-status');
 
         // 1. Handle Connection Status
@@ -56,11 +56,15 @@
             statusElement.classList.add('text-red-500');
         });
 
-        // 2. Listen for the 'update_text' event from the server
-        socket.on('update_text', function(msg) {
-            console.log('Received update:', msg.data);
-            // Update the display element with the new data
-            liveDataElement.innerHTML = msg.data;
+        // 2. Listen for the 'stream_update' event from the server
+        socket.on('stream_update', function(msg) {
+            console.log('Received updated stream. Total size:', msg.data.length);
+
+            // Replace the entire content with the new HTML stream
+            streamElement.innerHTML = msg.data;
+
+            // Optional: Scroll to the top to show the newest update
+            streamElement.parentElement.scrollTop = 0;
         });
 
     </script>

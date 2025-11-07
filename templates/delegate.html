@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delegate Input</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Socket.IO client library -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -20,8 +19,12 @@
         </h1>
 
         <p class="mb-4 text-sm text-gray-500">
-            Type your message and click "Send Update" to broadcast it instantly to all connected dashboards.
+            Enter your **ID/Country** and your **message** to broadcast an instant update.
         </p>
+
+        <input type="text" id="delegate-id-input"
+            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 mb-4"
+            placeholder="Enter your ID or Country (e.g., USA, Delegate #5)" maxlength="10">
 
         <textarea id="message-input" rows="4"
             class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 resize-none mb-6"
@@ -39,6 +42,7 @@
     <script>
         // Connect to the SocketIO server.
         const socket = io();
+        const idElement = document.getElementById('delegate-id-input');
         const inputElement = document.getElementById('message-input');
         const feedbackElement = document.getElementById('feedback-message');
 
@@ -47,7 +51,16 @@
         });
 
         function sendMessage() {
+            const delegateId = idElement.value.trim();
             const message = inputElement.value.trim();
+
+            if (delegateId === "") {
+                feedbackElement.textContent = "Please enter your ID/Country.";
+                feedbackElement.classList.remove('text-green-500');
+                feedbackElement.classList.add('text-red-500');
+                return;
+            }
+
             if (message === "") {
                 feedbackElement.textContent = "Please enter a message.";
                 feedbackElement.classList.remove('text-green-500');
@@ -56,13 +69,16 @@
             }
 
             // Emit the 'delegate_message' event with the payload
-            socket.emit('delegate_message', { message: message });
+            socket.emit('delegate_message', {
+                delegate_id: delegateId, // Pass the new ID
+                message: message
+            });
 
             // Provide visual feedback
-            feedbackElement.textContent = "Message sent successfully!";
+            feedbackElement.textContent = `Update sent from [${delegateId}]!`;
             feedbackElement.classList.remove('text-red-500');
             feedbackElement.classList.add('text-green-500');
-            inputElement.value = ''; // Clear input after sending
+            inputElement.value = ''; // Clear message input after sending
 
             // Clear feedback after a short delay
             setTimeout(() => {
