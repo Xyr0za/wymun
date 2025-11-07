@@ -5,7 +5,7 @@ from flask_socketio import SocketIO, emit, join_room
 # if you want to run multiple workers, though for a basic app,
 # the default Werkzeug server with eventlet installed is a start.
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_super_secret_key'  # Important for sessions/security
+app.config['SECRET_KEY'] = 'super_secret'  # Important for sessions/security
 socketio = SocketIO(app, cors_allowed_origins="*")  # Use cors_allowed_origins for testing
 
 # Variable to hold the text to display on the dashboard
