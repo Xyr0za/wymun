@@ -31,10 +31,23 @@
             placeholder="Enter live update message here..."></textarea>
 
         <button onclick="sendMessage()"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 transform active:scale-95">
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 transform active:scale-95 mb-6">
             Send Live Update
         </button>
 
+        <div class="border-t pt-6 mt-6 border-gray-200">
+            <h2 class="text-xl font-bold text-gray-700 mb-4 text-center">Cast a Vote</h2>
+            <div class="flex space-x-4">
+                <button onclick="sendVote('yay')"
+                    class="flex-1 bg-green-500 hover:bg-green-600 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 transform active:scale-95 text-xl">
+                    ✅ YAY (Agree)
+                </button>
+                <button onclick="sendVote('nay')"
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95 text-xl">
+                    ❌ NAY (Disagree)
+                </button>
+            </div>
+        </div>
         <div id="feedback-message" class="mt-4 text-center text-sm font-medium h-5"></div>
 
     </div>
@@ -50,21 +63,18 @@
             console.log('Delegate connected to server.');
         });
 
+        // --- Function for sending a text message (EXISTING) ---
         function sendMessage() {
             const delegateId = idElement.value.trim();
             const message = inputElement.value.trim();
 
             if (delegateId === "") {
-                feedbackElement.textContent = "Please enter your ID/Country.";
-                feedbackElement.classList.remove('text-green-500');
-                feedbackElement.classList.add('text-red-500');
+                setFeedback("Please enter your ID/Country.", 'red');
                 return;
             }
 
             if (message === "") {
-                feedbackElement.textContent = "Please enter a message.";
-                feedbackElement.classList.remove('text-green-500');
-                feedbackElement.classList.add('text-red-500');
+                setFeedback("Please enter a message.", 'red');
                 return;
             }
 
@@ -75,16 +85,42 @@
             });
 
             // Provide visual feedback
-            feedbackElement.textContent = `Update sent from [${delegateId}]!`;
-            feedbackElement.classList.remove('text-red-500');
-            feedbackElement.classList.add('text-green-500');
+            setFeedback(`Update sent from [${delegateId}]!`, 'green');
             inputElement.value = ''; // Clear message input after sending
+        }
+
+        // --- Function for sending a vote (NEW) ---
+        function sendVote(voteType) {
+            const delegateId = idElement.value.trim();
+
+            if (delegateId === "") {
+                setFeedback("Please enter your ID/Country before voting.", 'red');
+                return;
+            }
+
+            // Emit the 'delegate_vote' event
+            socket.emit('delegate_vote', {
+                delegate_id: delegateId,
+                vote: voteType // 'yay' or 'nay'
+            });
+
+            // Provide visual feedback
+            const voteText = voteType === 'yay' ? 'YAY' : 'NAY';
+            setFeedback(`Vote "${voteText}" sent from [${delegateId}]!`, 'green');
+        }
+
+        // --- Helper function for cleaner feedback (UPDATED) ---
+        function setFeedback(message, color) {
+            feedbackElement.textContent = message;
+            feedbackElement.classList.remove('text-green-500', 'text-red-500');
+            feedbackElement.classList.add(color === 'green' ? 'text-green-500' : 'text-red-500');
 
             // Clear feedback after a short delay
             setTimeout(() => {
                 feedbackElement.textContent = '';
             }, 3000);
         }
+
     </script>
 </body>
 </html>
