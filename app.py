@@ -1,324 +1,283 @@
-import time
-import uuid
-from functools import wraps
-from flask import Flask, render_template, request, session, redirect, url_for, flash, get_flashed_messages
-from flask_socketio import SocketIO, emit, disconnect
+from flask import Flask, render_template, request, redirect, url_for, session, flash, get_flashed_messages
+from flask_socketio import SocketIO, emit
+from datetime import datetime
+import json
 
-# --- Configuration & Initialization ---
+# --- CONFIGURATION ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_super_secret_mun_key'  # CHANGE THIS IN PRODUCTION
+app.config['SECRET_KEY'] = 'A_VERY_SECRET_KEY_FOR_MUN_APP'
 socketio = SocketIO(app)
 
-# --- Global Data Store (In-memory for simplicity. Use Redis/DB for production scale) ---
-# Each document in this list will be a dictionary.
+# Hardcoded roles for simulation
+ADMIN_USER = 'ADMIN'
+VALID_DELEGATES = ['UK', 'FRANCE', 'USA', 'CHINA', 'RUSSIA', 'GERMANY', 'INDIA']
+
+# --- GLOBAL STATE (Database/Firestore stand-in) ---
+# A list to store the chronological event stream
 mun_documents = []
 
-# --- Authentication Helpers (Simple placeholder for MUN roles) ---
-
-ADMIN_USER = 'ADMIN'
-
-
-def requires_auth(role='delegate'):
-    """Decorator to check user role for route access."""
-
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if 'user' not in session:
-                flash("Please log in to access this page.", 'error')
-                return redirect(url_for('login'))
-
-            user_role = session.get('role')
-            if role == 'admin' and user_role != 'admin':
-                flash("Access denied. Admin privileges required.", 'error')
-                return redirect(url_for('delegate'))  # Redirect to a safe page
-
-            return f(*args, **kwargs)
-
-        return decorated_function
-
-    return decorator
+# Vote Tracking State (New)
+current_vote_target = None
+current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
 
 
-# --- Data Rendering and Broadcasting ---
+# --- UTILITY FUNCTIONS ---
 
-def render_mun_document(doc):
-    """
-    Renders a single document dictionary into a stylized HTML block.
-    This function simulates the Jinja2 template rendering for clarity.
-    In a real app, this would use render_template_string or be moved to a macro.
-    """
-    doc_id = doc.get('id', 'unknown')
-    delegate = doc['delegate_id']
-    timestamp = doc['timestamp']
+def get_current_user_id():
+    """Retrieves the current user ID from the session."""
+    return session.get('user', 'Guest')
 
-    if doc['type'] == 'resolution':
-        return f"""
-        <div class="p-4 rounded-xl bg-indigo-100 border-l-4 border-indigo-600 shadow-sm relative">
-            <h3 class="text-xl font-bold text-indigo-800 mb-1">📜 Resolution: {doc['title']}</h3>
-            <p class="text-sm text-gray-600 mb-3">Submitted by: <span class="font-medium">{delegate}</span> at {timestamp}</p>
-            <div class="prose max-w-none text-gray-700 bg-indigo-50 p-3 rounded">{doc['content'].replace('\n', '<br>')}</div>
-            <button onclick="deleteDocument('{doc_id}')" class="absolute top-2 right-2 text-red-500 hover:text-red-700 text-sm font-bold">X Delete</button>
+
+def render_stream():
+    """Renders the current state of the document stream into HTML."""
+    # This is simplified. In a real app, you'd use Jinja to render templates here.
+    html_content = '<div class="space-y-4">'
+    for doc in reversed(mun_documents):
+        # Determine color/style based on type
+        bg_class = 'bg-white border-gray-200'
+        title_tag = 'h3'
+        if doc['type'] == 'resolution':
+            bg_class = 'bg-blue-50 border-blue-400'
+        elif doc['type'] == 'amendment':
+            bg_class = 'bg-yellow-50 border-yellow-400'
+        elif doc['type'] == 'vote_result':
+            bg_class = 'bg-green-100 border-green-600'
+
+        html_content += f"""
+        <div class="p-4 border-l-4 {bg_class} rounded-md shadow-md">
+            <{title_tag} class="text-lg font-semibold text-gray-800">{doc['title']}</{title_tag}>
+            <p class="text-sm text-gray-600 mt-1">
+                <span class="font-medium text-gray-900">{doc['delegate']}</span> 
+                ({doc['type'].replace('_', ' ').title()}) - 
+                <span class="text-xs text-gray-500">{doc['timestamp']}</span>
+            </p>
+            <p class="mt-2 text-gray-700 whitespace-pre-wrap">{doc.get('content', '')}</p>
         </div>
         """
-    elif doc['type'] == 'amendment':
-        return f"""
-        <div class="p-4 rounded-xl bg-orange-100 border-l-4 border-orange-600 shadow-sm relative">
-            <h3 class="text-xl font-bold text-orange-800 mb-1">✏️ Amendment: {doc['target']}</h3>
-            <p class="text-sm text-gray-600 mb-3">Proposed by: <span class="font-medium">{delegate}</span> at {timestamp}</p>
-            <p class="text-gray-700 bg-orange-50 p-3 rounded">{doc['text']}</p>
-            <button onclick="deleteDocument('{doc_id}')" class="absolute top-2 right-2 text-red-500 hover:text-red-700 text-sm font-bold">X Delete</button>
-        </div>
-        """
-    elif doc['type'] == 'vote_result':
-        return f"""
-        <div class="p-4 rounded-xl bg-gray-200 border-l-4 border-gray-800 shadow-md text-center">
-            <h3 class="text-2xl font-extrabold text-gray-900 mb-1">🏛️ FINAL VOTE RESULT 🏛️</h3>
-            <p class="text-lg font-semibold text-gray-700">{doc['target']}</p>
-            <div class="flex justify-around mt-3">
-                <span class="text-2xl font-bold text-green-600">✅ YAY: {doc['yay_count']}</span>
-                <span class="text-2xl font-bold text-red-600">❌ NAY: {doc['nay_count']}</span>
-            </div>
-            <button onclick="deleteDocument('{doc_id}')" class="absolute top-2 right-2 text-red-500 hover:text-red-700 text-sm font-bold">X Delete</button>
-        </div>
-        """
-    elif doc['type'] == 'vote':
-        # Votes are ephemeral and usually tallied, not displayed as individual documents.
-        # For this admin view, we'll return an empty string or a special placeholder.
-        return ""
-
-    return ""  # Fallback
-
-
-def render_stream(is_admin=False):
-    """Generates the full HTML stream from the mun_documents list."""
-    # We reverse to show newest documents at the top
-    html_content = [render_mun_document(doc) for doc in reversed(mun_documents)]
-
-    # Remove empty vote submissions from the displayed stream
-    clean_content = [c for c in html_content if c.strip()]
-
-    if not clean_content:
-        return '<div class="text-center py-10 text-gray-500">No documents submitted yet.</div>'
-
-    return "\n".join(clean_content)
+    html_content += '</div>'
+    return html_content
 
 
 def broadcast_stream():
     """Emits the updated stream to all connected clients."""
-    # The rendered stream is the same for delegate and dashboard view.
     stream_html = render_stream()
+    # FIX 1: Ensure broadcast=True is used to hit all connected dashboards/admins
     socketio.emit('stream_update', {'data': stream_html}, broadcast=True)
 
 
-# --- HTTP Routes ---
+# --- ROUTES ---
 
-@app.route('/', defaults={'path': 'login'})
-@app.route('/<path:path>')
-def redirect_to_login(path):
-    if 'user' not in session:
-        return redirect(url_for('login'))
-    if session.get('role') == 'admin':
-        return redirect(url_for('admin'))
-    return redirect(url_for('delegate'))
+@app.route('/')
+def index():
+    if 'user' in session:
+        if session.get('role') == 'admin':
+            return redirect(url_for('admin_page'))
+        else:
+            return redirect(url_for('delegate_page'))
+    return redirect(url_for('login'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username'].upper().strip()
+        username = request.form.get('username', '').upper().strip()
 
         if username == ADMIN_USER:
-            session['user'] = ADMIN_USER
+            session['user'] = username
             session['role'] = 'admin'
-            flash(f"Welcome, Chairman {ADMIN_USER}!", 'info')
-            return redirect(url_for('admin'))
+            flash(f'Logged in as Chairman ({username}).', 'success')
+            return redirect(url_for('admin_page'))
 
-        if username:
+        elif username in VALID_DELEGATES:
             session['user'] = username
             session['role'] = 'delegate'
-            flash(f"Logged in as Delegate: {username}", 'info')
-            return redirect(url_for('delegate'))
+            flash(f'Logged in as Delegate for {username}.', 'success')
+            return redirect(url_for('delegate_page'))
 
-        flash("Username cannot be empty.", 'error')
+        else:
+            flash('Invalid Delegate ID or Admin code.', 'error')
+            return render_template('login.html')
 
-    # Get flashed messages before rendering the template
-    messages = get_flashed_messages(with_categories=True)
-    return render_template('login.html', messages=messages)
+    return render_template('login.html')
 
 
 @app.route('/logout')
 def logout():
     session.pop('user', None)
     session.pop('role', None)
-    flash("You have been logged out.", 'info')
+    flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
 
 @app.route('/delegate')
-@requires_auth(role='delegate')
-def delegate():
-    # 'delegate_id' in template is used for JS client to identify itself
+def delegate_page():
+    if session.get('role') != 'delegate':
+        flash('Access denied. Please log in as a delegate.', 'error')
+        return redirect(url_for('login'))
     return render_template('delegate.html', delegate_id=session['user'])
 
 
 @app.route('/admin')
-@requires_auth(role='admin')
-def admin():
-    # Admin view loads the stream initially
-    initial_content = render_stream(is_admin=True)
-    return render_template('admin.html', initial_content=initial_content)
+def admin_page():
+    if session.get('role') != 'admin':
+        flash('Access denied. Please log in as the Administrator.', 'error')
+        return redirect(url_for('login'))
+    return render_template('admin.html', delegate_id=session['user'])
 
 
 @app.route('/dashboard')
 def dashboard():
-    # Public view loads the stream initially
-    initial_content = render_stream(is_admin=False)
-    return render_template('dashboard.html', initial_content=initial_content)
+    return render_template('dashboard.html', stream_content=render_stream())
 
 
-@app.route('/clear_stream', methods=['POST'])
-@requires_auth(role='admin')
-def clear_stream_route():
-    """HTTP route for the admin's hard reset button."""
-    global mun_documents
-    mun_documents = []  # Hard reset the data
-
-    # Broadcast the empty stream immediately
-    broadcast_stream()
-
-    flash("All MUN documents have been cleared (Hard Reset).", 'success')
-    return redirect(url_for('admin'))
-
-
-# --- SocketIO Event Handlers ---
-
-# Variable to hold live vote tallies
-current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
-current_vote_target = None  # What is being voted on
-
+# --- SOCKETIO EVENT HANDLERS ---
 
 @socketio.on('connect')
 def handle_connect():
-    # Ensures only authenticated users connect to the SocketIO
-    if 'user' not in session:
-        return False  # Reject connection if not authenticated
-
-    print(f"{session.get('role')} {session['user']} connected.")
-
-    # Immediately send the full stream to the newly connected client
+    """Handles new client connection."""
+    user = get_current_user_id()
+    app.logger.info(f'{user} connected.')
+    # Send the initial stream content immediately upon connection
     emit('stream_update', {'data': render_stream()})
+
+    # Send current vote status on connect (New)
+    global current_vote_target
+    if current_vote_target:
+        emit('vote_started', {'target': current_vote_target})
 
 
 @socketio.on('mun_submission')
 def handle_mun_submission(data):
-    """Handles resolution, amendment, and individual vote submissions."""
-    delegate_id = session.get('user')
-    submission_type = data.get('type')
+    """Handles submissions of resolutions, amendments, and votes."""
 
-    if not delegate_id:
-        disconnect()
+    submission_type = data.get('type')
+    delegate_id = session.get('user')
+
+    if not delegate_id or delegate_id not in VALID_DELEGATES and delegate_id != ADMIN_USER:
+        emit('feedback', {'message': 'Authentication error.'})
         return
 
-    new_doc = {
-        'id': str(uuid.uuid4()),
-        'delegate_id': delegate_id,
-        'type': submission_type,
-        'timestamp': time.strftime("%H:%M:%S")
-    }
-
-    if submission_type == 'resolution':
-        new_doc['title'] = data.get('title', 'Untitled Resolution')
-        new_doc['content'] = data.get('content', 'No content provided.')
-        mun_documents.append(new_doc)
-
-    elif submission_type == 'amendment':
-        new_doc['target'] = data.get('target', 'Unknown Target')
-        new_doc['text'] = data.get('text', 'No amendment text provided.')
-        mun_documents.append(new_doc)
-
-    elif submission_type == 'vote':
+    # --- Vote Submission Handler (FIX 2.A) ---
+    if submission_type == 'vote':
+        global current_vote_target, current_vote_tally
         vote = data.get('vote')
-        # Only process votes if a formal vote is currently active
-        if current_vote_target and delegate_id not in current_vote_tally['voters']:
-            if vote == 'yay':
-                current_vote_tally['yay'] += 1
-                current_vote_tally['voters'].add(delegate_id)
-            elif vote == 'nay':
-                current_vote_tally['nay'] += 1
-                current_vote_tally['voters'].add(delegate_id)
 
-            # Send a specific update to the admin only, showing the tally changing
-            emit('vote_tally_update', current_vote_tally, room=ADMIN_USER)  # Assuming admin is in a room
-            return  # Do not broadcast full stream for every vote
-        else:
-            # Optionally send feedback to the specific delegate if vote is inactive/already cast
-            emit('feedback', {'message': 'Vote inactive or already cast.'})
-            return  # Do not broadcast full stream
+        if not current_vote_target:
+            emit('feedback', {'message': 'No formal vote is currently active.'})
+            return
 
-    # For Resolutions and Amendments, broadcast the updated stream
-    if submission_type in ['resolution', 'amendment']:
+        if delegate_id in current_vote_tally['voters']:
+            emit('feedback', {'message': 'You have already cast your vote.'})
+            return
+
+        if vote in ['yay', 'nay']:
+            current_vote_tally[vote] += 1
+            current_vote_tally['voters'].add(delegate_id)
+            emit('feedback', {'message': f'Vote recorded: {vote.upper()} on {current_vote_target}'})
+
+            # Broadcast the live tally update to the admin page
+            socketio.emit('vote_tally_update', {
+                'target': current_vote_target,
+                'yay': current_vote_tally['yay'],
+                'nay': current_vote_tally['nay'],
+                'voter_count': len(current_vote_tally['voters'])
+            }, broadcast=True)
+            return  # Stop here to prevent individual votes from showing in the main stream
+
+        return
+
+    # --- Resolution/Amendment Submission Handler ---
+    elif submission_type in ['resolution', 'amendment']:
+        new_doc = {
+            'type': submission_type,
+            'title': data.get('title'),
+            'content': data.get('content'),
+            'delegate': delegate_id,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        mun_documents.append(new_doc)
+
+        emit('feedback', {'message': f'{submission_type.title()} "{new_doc["title"]}" submitted.'}, broadcast=False)
+
+        # Broadcast the updated stream to all clients (FIX 1)
         broadcast_stream()
+        return
+
+    emit('feedback', {'message': 'Invalid submission type.'})
 
 
 @socketio.on('moderator_action')
-@requires_auth(role='admin')  # Ensure only authenticated admins can send this
 def handle_moderator_action(data):
-    """Handles admin actions like deleting documents and managing votes."""
-    global mun_documents, current_vote_tally, current_vote_target
+    """Handles actions specific to the Admin (Chairman) role."""
+
+    if session.get('role') != 'admin':
+        emit('feedback', {'message': 'Unauthorized action.'})
+        return
+
     action = data.get('action')
 
-    if action == 'delete':
-        doc_id = data.get('document_id')
+    if action == 'start_vote':
+        global current_vote_target, current_vote_tally
+        target_title = data.get('target', 'Unnamed Resolution/Amendment')
 
-        # Remove the document from the global list
-        global mun_documents
-        mun_documents = [d for d in mun_documents if d.get('id') != doc_id]
-
-        # Re-render and broadcast
-        broadcast_stream()
-
-    elif action == 'initiate_vote':
-        target = data.get('target', 'Current Motion')
-
-        # Reset tallies and set target
+        # 1. Reset and activate the vote
+        current_vote_target = target_title
         current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
-        current_vote_target = target
 
-        # Announce the start of the vote to all delegates
-        socketio.emit('vote_status', {'active': True, 'target': target}, broadcast=True)
+        flash(f'Formal vote on "{target_title}" has started.', 'info')
+        # 2. Announce the vote start to all clients (Delegates need this)
+        socketio.emit('vote_started', {'target': target_title}, broadcast=True)
+        # 3. Inform Admin directly
+        emit('feedback', {'message': f'Formal vote on "{target_title}" started.'})
 
     elif action == 'finalize_vote':
-        target = current_vote_target
+        global current_vote_target, current_vote_tally
+
+        if not current_vote_target:
+            emit('feedback', {'message': 'No vote is currently active to finalize.'})
+            return
+
+        # 1. Calculate the result
         yay = current_vote_tally['yay']
         nay = current_vote_tally['nay']
+        total_votes = yay + nay
+        result = 'PASSED' if yay > nay else 'FAILED'
 
-        # Create a final vote result document
-        result_doc = {
-            'id': str(uuid.uuid4()),
-            'delegate_id': 'CHAIR',
+        # 2. Create the result document
+        result_content = (
+            f"Result: {result}\n\n"
+            f"Yay: {yay}\n"
+            f"Nay: {nay}\n"
+            f"Abstentions/Not Voted: {len(VALID_DELEGATES) - len(current_vote_tally['voters'])}\n"
+            f"Total Votes Cast: {total_votes}"
+        )
+        new_doc = {
             'type': 'vote_result',
-            'timestamp': time.strftime("%H:%M:%S"),
-            'target': target,
-            'yay_count': yay,
-            'nay_count': nay
+            'title': f'VOTE RESULT: {current_vote_target}',
+            'content': result_content,
+            'delegate': 'CHAIRMAN',
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
+        mun_documents.append(new_doc)
 
-        # Add the result to the main document stream
-        mun_documents.append(result_doc)
-
-        # Deactivate the current vote
-        current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
+        # 3. Reset the global vote state
         current_vote_target = None
+        current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
 
-        # Announce the end of the vote and broadcast the result document
-        socketio.emit('vote_status', {'active': False}, broadcast=True)
+        # 4. Broadcast the new stream and inform clients the vote is over
         broadcast_stream()
+        socketio.emit('vote_ended', broadcast=True)  # Tells delegates to hide buttons
 
+        emit('feedback', {'message': f'Vote on "{new_doc["title"]}" finalized and published.'})
 
-# --- Run Server ---
+    elif action == 'clear_stream':
+        global mun_documents
+        mun_documents = []
+        broadcast_stream()
+        emit('feedback', {'message': 'Document stream cleared.'})
+
 
 if __name__ == '__main__':
-    # Use the dashboard template name for the public view
-    app.add_url_rule('/stream', view_func=dashboard)
+    # Use a high-level logging configuration
+    app.logger.setLevel('INFO')
     socketio.run(app, debug=True)

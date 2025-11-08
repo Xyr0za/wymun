@@ -3,105 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MUN Chairman Dashboard</title>
+    <title>Chairman Control Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
+        .sidebar { background-color: #0B2447; }
+        .header { border-bottom: 2px solid #D1D5DB; }
+        textarea { resize: none; }
     </style>
 </head>
-<body class="bg-[#F5F5F7] min-h-screen p-4 md:p-8">
+<body class="flex flex-col min-h-screen">
 
-    <div class="max-w-5xl mx-auto">
-
-        <header class="flex justify-between items-center mb-6 pb-4 border-b-2 border-[#0B2447]">
-            <h1 class="text-4xl font-extrabold text-[#0B2447]">
-                 gavel Chairman Control 👨‍⚖️
-            </h1>
-            <div>
-                <span class="text-md font-semibold text-gray-700 mr-4">Chair: ADMIN</span>
-                <a href="{{ url_for('logout') }}" class="text-sm text-red-600 hover:text-red-800 font-medium">Logout</a>
-            </div>
-        </header>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-4">
-                    {% for category, message in messages %}
-                        <li class="p-3 mb-2 rounded font-medium
-                            {% if category == 'error' %} bg-red-100 text-red-800 border-l-4 border-red-600
-                            {% elif category == 'info' %} bg-blue-100 text-blue-800 border-l-4 border-[#478E99]
-                            {% else %} bg-green-100 text-green-800 border-l-4 border-green-600
-                            {% endif %}">
-                            {{ message }}
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-red-600">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">Hard Reset</h2>
-                <form action="{{ url_for('clear_stream') }}" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to CLEAR ALL documents? This action cannot be undone.');">
-                    <button type="submit"
-                        class="w-full bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95">
-                        Clear All Documents (Full System Reset)
-                    </button>
-                </form>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-green-600">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">Formal Vote Initiation</h2>
-                <button onclick="initiateVote()"
-                    class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md focus:outline-none focus:ring-4 focus:ring-green-300 transform active:scale-95">
-                    START Formal Vote (Signals Delegates)
-                </button>
-                </div>
+    <!-- Header and Sidebar -->
+    <header class="header bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+        <h1 class="text-2xl font-bold text-[#0B2447]">Chairman Panel ({{ delegate_id }})</h1>
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('dashboard') }}" target="_blank" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition">View Dashboard</a>
+            <a href="{{ url_for('logout') }}" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Logout</a>
         </div>
+    </header>
 
-        <h2 class="text-3xl font-extrabold text-gray-800 mb-4">Live Document Review</h2>
-        <div id="update-stream" class="space-y-4 p-4 bg-white rounded-xl shadow-lg border">
+    <main class="flex flex-grow p-6 space-x-6">
+
+        <!-- CONTROL COLUMN -->
+        <section class="w-1/3 space-y-6">
+
+            <!-- Flash Messages -->
+            <div id="flash-container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <ul class="space-y-2">
+                            {% for category, message in messages %}
+                                <li class="p-3 rounded-lg font-medium border-l-4
+                                    {% if category == 'error' %} bg-red-100 text-red-800 border-red-600
+                                    {% elif category == 'info' %} bg-blue-100 text-blue-800 border-blue-600
+                                    {% else %} bg-green-100 text-green-800 border-green-600
+                                    {% endif %}" id="flash-{{ loop.index }}">
+                                    {{ message }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
             </div>
 
-    </div>
+            <!-- Chairman Actions (New Vote Logic) -->
+            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-[#0B2447]">
+                <h2 class="text-xl font-bold text-[#0B2447] mb-4">Chairman Actions</h2>
+
+                <label for="vote_target" class="block text-sm font-medium text-gray-700 mb-2">
+                    Start Formal Vote (Target Document Title)
+                </label>
+                <input type="text" id="vote_target" name="vote_target"
+                       class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99]"
+                       placeholder="e.g., Resolution 1.1">
+
+                <button onclick="startVote()"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg mt-3 transition duration-150 transform active:scale-95">
+                    Start Formal Vote
+                </button>
+
+                <!-- Vote Status Panel (FIX 2.B) -->
+                <div class="bg-yellow-100 p-4 rounded-xl shadow-inner border-t-4 border-yellow-500 mt-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">Live Vote Tally</h3>
+                    <p id="vote-target-display" class="font-medium text-center text-red-600">No formal vote currently active.</p>
+                    <div id="vote-results" class="flex justify-around items-center mt-3 p-2 bg-yellow-50 rounded-lg border">
+                        <span class="text-xl text-green-700">✅ YAY: <span id="yay-count" class="font-extrabold text-2xl">0</span></span>
+                        <span class="text-xl text-red-700">❌ NAY: <span id="nay-count" class="font-extrabold text-2xl">0</span></span>
+                    </div>
+                    <p id="voter-count" class="text-sm text-gray-600 mt-2 text-center"></p>
+
+                    <button onclick="finalizeVote()"
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg mt-4 transition duration-150 transform active:scale-95">
+                        Finalize Vote & Publish Result
+                    </button>
+                </div>
+
+                <button onclick="clearStream()"
+                    class="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 rounded-lg mt-6 transition duration-150 transform active:scale-95">
+                    Clear Document Stream (DANGER)
+                </button>
+            </div>
+
+        </section>
+
+        <!-- LIVE STREAM COLUMN -->
+        <section class="w-2/3 bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-[#0B2447] mb-4 border-b pb-2">Live Document Stream</h2>
+            <div id="document-stream" class="h-[75vh] overflow-y-auto pr-2">
+                <!-- Initial content is loaded by Flask, subsequent updates via SocketIO -->
+                {{ stream_content | safe }}
+            </div>
+        </section>
+
+    </main>
 
     <script>
         const socket = io();
-        const updateStreamDiv = document.getElementById('update-stream');
+        const documentStream = document.getElementById('document-stream');
+        const voteTargetDisplay = document.getElementById('vote-target-display');
+        const yayCount = document.getElementById('yay-count');
+        const nayCount = document.getElementById('nay-count');
+        const voterCount = document.getElementById('voter-count');
+        const voteResults = document.getElementById('vote-results');
 
-        socket.on('connect', () => {
-            console.log('Admin connected to server.');
+        // --- SocketIO Handlers ---
+
+        // FIX 1: Stream Update Listener
+        socket.on('stream_update', function(msg) {
+            documentStream.innerHTML = msg.data;
+            documentStream.scrollTop = 0; // Scroll to the top for the newest item
         });
 
-        // Handler to receive the full rendered stream HTML for review/moderation
-        socket.on('stream_update', (data) => {
-            // The server needs to ensure the HTML sent to the admin includes moderator controls (e.g., delete buttons)
-            updateStreamDiv.innerHTML = data.data;
+        // FIX 2.B: Live Vote Tally Listener
+        socket.on('vote_tally_update', function(data) {
+            voteTargetDisplay.textContent = `Voting on: ${data.target}`;
+            yayCount.textContent = data.yay;
+            nayCount.textContent = data.nay;
+            voterCount.textContent = `Total Unique Votes: ${data.voter_count}`;
+            voteTargetDisplay.classList.remove('text-red-600');
+            voteTargetDisplay.classList.add('text-green-700');
+            voteResults.classList.remove('hidden');
         });
 
-        // --- New Function: Example Moderator Action ---
-        // This function would be triggered by a button rendered inside the stream_update data.
-        function deleteDocument(documentId) {
-            if (confirm(`Are you sure you want to delete document ID: ${documentId}?`)) {
+        socket.on('vote_ended', function() {
+            voteTargetDisplay.textContent = 'No formal vote currently active.';
+            voteTargetDisplay.classList.add('text-red-600');
+            voteTargetDisplay.classList.remove('text-green-700');
+            yayCount.textContent = 0;
+            nayCount.textContent = 0;
+            voterCount.textContent = '';
+            voteResults.classList.add('hidden');
+        });
+
+        socket.on('feedback', function(msg) {
+            displayFlashMessage(msg.message, 'info');
+        });
+
+        // --- Action Functions ---
+
+        function startVote() {
+            const target = document.getElementById('vote_target').value.trim();
+            if (!target) {
+                displayFlashMessage('Please enter the title of the document being voted on.', 'error');
+                return;
+            }
+            if (confirm(`Start a formal vote on: ${target}? This will reset any existing vote.`)) {
                 socket.emit('moderator_action', {
-                    action: 'delete',
-                    document_id: documentId
+                    action: 'start_vote',
+                    target: target
+                });
+                document.getElementById('vote_target').value = '';
+            }
+        }
+
+        function finalizeVote() {
+            if (confirm('Are you sure you want to finalize the vote, publish the results to the stream, and end the voting period?')) {
+                socket.emit('moderator_action', {
+                    action: 'finalize_vote'
                 });
             }
         }
 
-        // --- New Function: Initiate Formal Vote ---
-        function initiateVote() {
-             if (confirm('Are you ready to initiate a formal vote? This will be announced to all delegates.')) {
-                // Emit an event the server can use to flag the session as being in a 'voting' state
+        function clearStream() {
+            if (confirm('WARNING: Are you absolutely sure you want to clear ALL documents from the stream? This cannot be undone.')) {
                 socket.emit('moderator_action', {
-                    action: 'initiate_vote',
-                    // You might include the target resolution ID here
+                    action: 'clear_stream'
                 });
-                alert('Formal Vote initiated! Delegates can now submit YAY/NAY votes.');
             }
+        }
+
+        function displayFlashMessage(message, category) {
+            const container = document.getElementById('flash-container');
+            const element = document.createElement('li');
+            element.className = `p-3 rounded-lg font-medium border-l-4 my-2 transition duration-500 opacity-0`;
+
+            if (category === 'error') {
+                element.classList.add('bg-red-100', 'text-red-800', 'border-red-600');
+            } else {
+                element.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-600');
+            }
+
+            element.textContent = message;
+            container.prepend(element);
+
+            // Animate in and out
+            setTimeout(() => element.classList.remove('opacity-0'), 10);
+            setTimeout(() => element.classList.add('opacity-0'), 5000);
+            setTimeout(() => element.remove(), 5600);
         }
 
     </script>

@@ -3,71 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MUN Live Event Stream</title>
+    <title>MUN Live Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
     </style>
 </head>
-<body class="bg-[#F5F5F7] min-h-screen p-4">
+<body class="p-6">
 
-    <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-4xl mx-auto border-t-4 border-[#0B2447]">
-        <h1 class="text-4xl font-extrabold text-[#0B2447] mb-6 tracking-tight text-center">
-            Diplomatic Document Stream 📜
+    <header class="mb-8 border-b-4 border-[#0B2447] pb-4">
+        <h1 class="text-4xl font-extrabold text-[#0B2447] text-center">
+            UN/GA Emergency Session Live Feed
         </h1>
-
-        <div class="mb-8 p-4 bg-gray-100 rounded-lg text-center">
-            <p class="text-sm font-semibold text-gray-600">Status: <span id="connection-status" class="text-red-600">Connecting...</span></p>
-        </div>
-
-        <div class="border-4 border-[#478E99] border-dashed p-4 md:p-6 rounded-xl bg-gray-50 max-h-[70vh] overflow-y-auto">
-            <h2 class="text-xl md:text-2xl font-bold text-gray-700 mb-4 text-center sticky top-0 bg-gray-50 py-2 border-b">
-                Active Resolutions & Amendments
-            </h2>
-            <div id="update-stream" class="flex flex-col space-y-4">
-                {{ initial_content }}
-                </div>
-        </div>
-
-        <p class="mt-8 text-gray-500 text-center">
-            Open the <a href="/delegate" class="text-[#478E99] hover:text-[#0B2447] font-medium">Delegate Submission Portal</a> in another window to submit documents.
+        <p class="text-lg text-gray-600 text-center mt-2">
+            Real-time resolutions, amendments, and vote results.
         </p>
-    </div>
+    </header>
+
+    <!-- LIVE STREAM CONTAINER -->
+    <section class="bg-white p-6 rounded-xl shadow-2xl">
+        <h2 class="text-2xl font-bold text-[#478E99] mb-4 border-b pb-2">Document Stream</h2>
+        <div id="document-stream" class="min-h-[70vh] max-h-[85vh] overflow-y-auto pr-2">
+            <!-- Initial content loaded by Flask, subsequent updates via SocketIO -->
+            {{ stream_content | safe }}
+        </div>
+    </section>
 
     <script>
-        // Connect to the SocketIO server.
         const socket = io();
-        const streamElement = document.getElementById('update-stream');
-        const statusElement = document.getElementById('connection-status');
+        const documentStream = document.getElementById('document-stream');
 
-        // 1. Handle Connection Status
-        socket.on('connect', () => {
-            statusElement.textContent = 'Connected';
-            statusElement.classList.remove('text-red-600');
-            statusElement.classList.add('text-green-600');
-            console.log('Connected to server!');
-        });
-
-        socket.on('disconnect', () => {
-            statusElement.textContent = 'Disconnected';
-            statusElement.classList.remove('text-green-600');
-            statusElement.classList.add('text-red-600');
-        });
-
-        // 2. Listen for the 'stream_update' event from the server
-        // The server will send a complete, re-rendered HTML block containing all styled documents.
+        // FIX 1: Stream Update Listener (Ensures real-time updates)
         socket.on('stream_update', function(msg) {
-            console.log('Received updated MUN stream.');
-
-            // Replace the entire content with the new HTML stream
-            streamElement.innerHTML = msg.data;
-
-            // Optional: Scroll to the top to show the newest update
-            streamElement.parentElement.scrollTop = 0;
+            documentStream.innerHTML = msg.data;
+            documentStream.scrollTop = 0; // Scroll to the top for the newest item
         });
 
+        // The dashboard only needs to receive the updates, it does not send data.
     </script>
 </body>
 </html>
