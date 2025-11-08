@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delegate Login</title>
+    <title>MUN Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -14,34 +14,45 @@
 
     <div class="bg-white p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-sm border-t-4 border-[#0B2447]">
         <h1 class="text-3xl font-bold text-[#0B2447] mb-6 text-center">
-            Delegate Sign-In
+            MUN System Login
         </h1>
-
-        <form method="POST">
-            <p class="mb-4 text-sm text-gray-500">
-                Enter your  <b>Delegate PIN</b> to access the session.
-            </p>
-
-            <input type="password" name="pin"
-                class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99] mb-4 text-center text-xl tracking-wider"
-                placeholder="•••••" maxlength="5" required>
-
-            <button type="submit"
-                class="w-full bg-[#0B2447] hover:bg-[#1E3A5F] text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-[#6B7280] transform active:scale-95">
-                Sign In
-            </button>
-        </form>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <ul class="mt-4 text-center">
-                {% for category, message in messages %}
-                    <li class="text-sm {% if category == 'error' %}text-red-600{% else %}text-green-600{% endif %} font-medium">{{ message }}</li>
-                {% endfor %}
+                <ul class="mb-4">
+                    {% for category, message in messages %}
+                        <li class="p-3 mb-2 rounded font-medium
+                            {% if category == 'error' %} bg-red-100 text-red-800 border-l-4 border-red-600
+                            {% elif category == 'info' %} bg-blue-100 text-blue-800 border-l-4 border-[#478E99]
+                            {% else %} bg-green-100 text-green-800 border-l-4 border-green-600
+                            {% endif %}">
+                            {{ message }}
+                        </li>
+                    {% endfor %}
                 </ul>
             {% endif %}
         {% endwith %}
 
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="mb-6">
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
+                    Enter Your Delegate ID or ADMIN
+                </label>
+                <input type="text" id="username" name="username" required
+                    class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99]"
+                    placeholder="e.g., UK, FRANCE, ADMIN" autocomplete="off">
+            </div>
+
+            <button type="submit"
+                class="w-full bg-[#0B2447] hover:bg-[#1E3A5F] text-white font-semibold py-3 rounded-xl transition duration-200 shadow-lg transform active:scale-95">
+                Log In
+            </button>
+        </form>
+
+        <p class="mt-6 text-center text-sm text-gray-500">
+            For public viewing: <a href="{{ url_for('dashboard') }}" class="text-[#478E99] hover:text-[#0B2447] font-medium">Live Dashboard</a>
+        </p>
     </div>
+
 </body>
 </html>
