@@ -1,22 +1,24 @@
 import eventlet
 import json
-import os  # Added for path manipulation
+import os
+from datetime import datetime
 
 # Patch standard Python libraries to be cooperative (non-blocking)
 eventlet.monkey_patch()
 
 from flask import Flask, render_template, request, session, redirect, url_for, flash
 from flask_socketio import SocketIO, emit
-from datetime import datetime
+
+# --- Admin Configuration ---
+ADMIN_PIN = '32541'  # The specific PIN for admin login
+ADMIN_ID = 'ADMIN'  # The identifier for the admin user
 
 # --- Load Delegate Credentials from JSON ---
-# Determine the path to the delegates.json file
 SITE_ROOT = os.path.realpath(os.path.dirname(__file__))
 json_url = os.path.join(SITE_ROOT, "delegates.json")
 
 try:
     with open(json_url, 'r') as f:
-        # PIN to Delegate ID/Country mapping
         DELEGATE_CREDENTIALS = json.load(f)
 except FileNotFoundError:
     print("WARNING: delegates.json not found. Authentication will fail.")
@@ -36,8 +38,6 @@ update_stream = []
 # --- Helper Function to Render Stream (NO CHANGE) ---
 def render_update_stream():
     """Renders the entire update_stream list into a readable HTML string."""
-    # ... (Your existing render_update_stream function content goes here) ...
-    # This function remains unchanged from the original code provided in the prompt.
     html_content = ""
     if not update_stream:
         return "<p class='text-gray-500 italic'>No updates yet...</p>"
@@ -76,7 +76,7 @@ def render_update_stream():
     return html_content
 
 
-# --- NEW Routes for Login/Logout ---
+# --- NEW Routes for Login/Logout (MODIFIED to include Admin) ---
 
 @app.route('/')
 def index():
@@ -86,19 +86,23 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Handles delegate sign-in using a PIN."""
+    """Handles delegate and admin sign-in using a PIN."""
     if request.method == 'POST':
         pin = request.form.get('pin')
 
-        # Check if PIN is in the credentials
-        if pin in DELEGATE_CREDENTIALS:
-            delegate_id = DELEGATE_CREDENTIALS[pin]
-            # Store the delegate ID in the session
-            session['delegate_id'] = delegate_id
+        # 1. Check for Admin PIN
+        if pin == ADMIN_PIN:
+            session['delegate_id'] = ADMIN_ID
+            flash('Admin login successful.', 'success')
+            return redirect(url_for('admin'))  # Redirect to the new admin page
 
-            # Redirect to the main delegate input page with the ID in the URL
-            # The URL parameter ensures the ID is visually present and easily accessible.
+        # 2. Check for Delegate PIN
+        elif pin in DELEGATE_CREDENTIALS:
+            delegate_id = DELEGATE_CREDENTIALS[pin]
+            session['delegate_id'] = delegate_id
             return redirect(url_for('delegate', delegate_id=delegate_id))
+
+        # 3. Invalid PIN
         else:
             flash('Invalid PIN. Please try again.', 'error')
 
@@ -114,32 +118,62 @@ def logout():
     return redirect(url_for('login'))
 
 
-# --- Existing Routes (MODIFIED) ---
+# --- NEW Admin Routes ---
+
+@app.route('/admin')
+def admin():
+    """Admin dashboard - view and clear stream."""
+    # Check for ADMIN_ID in session
+    if session.get('delegate_id') != ADMIN_ID:
+        flash('Admin access required.', 'error')
+        return redirect(url_for('login'))
+
+    initial_content = render_update_stream()
+    return render_template('admin.html', initial_content=initial_content)
+
+
+@app.route('/admin/clear', methods=['POST'])
+def clear_stream():
+    """Clears the update stream and broadcasts the change."""
+    global update_stream
+
+    # Security check: Only allow ADMIN to clear
+    if session.get('delegate_id') != ADMIN_ID:
+        flash('Unauthorized attempt to clear stream.', 'error')
+        return redirect(url_for('login'))
+
+    update_stream = []  # Clear the stream!
+
+    # Broadcast an empty stream to all connected clients (dashboard/admin)
+    socketio.emit('stream_update', {'data': render_update_stream()}, broadcast=True)
+
+    flash('Update stream successfully cleared!', 'success')
+    return redirect(url_for('admin'))
+
+
+# --- Existing Routes (NO CHANGE) ---
 
 @app.route('/dashboard')
 def dashboard():
-    """Main dashboard page - displays live updates (NO CHANGE)."""
+    """Main dashboard page - displays live updates."""
     initial_content = render_update_stream()
     return render_template('dashboard.html', initial_content=initial_content)
 
 
 @app.route('/delegate')
 def delegate():
-    """Delegate input page - sends the data (MODIFIED)."""
+    """Delegate input page - sends the data."""
     # Check if delegate is logged in via session
-    if 'delegate_id' not in session:
-        flash('Please log in to access the delegate input.', 'error')
+    current_delegate_id = session.get('delegate_id')
+
+    if not current_delegate_id or current_delegate_id == ADMIN_ID:
+        flash('Please log in as a delegate to access the input.', 'error')
         return redirect(url_for('login'))
 
-    # Get ID from session and use it in the template
-    current_delegate_id = session['delegate_id']
     return render_template('delegate.html', delegate_id=current_delegate_id)
 
 
-# --- WebSocket Handlers (MINOR MODIFICATION) ---
-
-# The socket handlers remain largely the same, but the client-side code will now
-# send the ID from the URL, which then gets standardized to uppercase in the handler.
+# --- WebSocket Handlers (NO CHANGE) ---
 
 @socketio.on('connect')
 def handle_connect():
@@ -153,22 +187,18 @@ def handle_connect():
 def handle_delegate_message(data):
     """Handles a message event from the /delegate page."""
     global update_stream
-
-    # The delegate_id is now retrieved directly from the data sent by the client.
     delegate_id = data.get('delegate_id', 'UNKNOWN')
     new_message = data.get('message', 'No message provided')
     timestamp = datetime.now().strftime('%H:%M:%S')
 
     new_update = {
-        'id': delegate_id.upper(),  # Standardize ID
+        'id': delegate_id.upper(),
         'message': new_message,
         'timestamp': timestamp,
         'type': 'message'
     }
-
     update_stream.append(new_update)
     print(f"[{timestamp}] New Update from {delegate_id}: {new_message}")
-
     updated_stream_html = render_update_stream()
     emit('stream_update', {'data': updated_stream_html}, broadcast=True)
 
@@ -177,22 +207,18 @@ def handle_delegate_message(data):
 def handle_delegate_vote(data):
     """Handles a vote event from the /delegate page."""
     global update_stream
-
-    # The delegate_id is now retrieved directly from the data sent by the client.
     delegate_id = data.get('delegate_id', 'UNKNOWN')
     vote = data.get('vote', 'unknown')
     timestamp = datetime.now().strftime('%H:%M:%S')
 
     new_update = {
-        'id': delegate_id.upper(),  # Standardize ID
+        'id': delegate_id.upper(),
         'vote': vote,
         'timestamp': timestamp,
         'type': 'vote'
     }
-
     update_stream.append(new_update)
     print(f"[{timestamp}] New Vote from {delegate_id}: {vote}")
-
     updated_stream_html = render_update_stream()
     emit('stream_update', {'data': updated_stream_html}, broadcast=True)
 
