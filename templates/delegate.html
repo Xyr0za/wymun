@@ -14,17 +14,18 @@
 <body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
 
     <div class="bg-white p-8 md:p-10 rounded-xl shadow-xl w-full max-w-lg">
-        <h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">
+        <h1 class="text-3xl font-bold text-blue-600 mb-2 text-center">
             Delegate Live Input
         </h1>
 
-        <p class="mb-4 text-sm text-gray-500">
-            Enter your **ID/Country** and your **message** to broadcast an instant update.
-        </p>
+        <div class="text-lg font-bold text-gray-700 mb-6 text-center">
+            Logged in as: <span id="delegate-id-display" class="text-blue-700">{{ delegate_id }}</span>
+            <a href="{{ url_for('logout') }}" class="text-xs text-red-500 hover:text-red-700 ml-3 font-normal align-top">Logout</a>
+        </div>
 
-        <input type="text" id="delegate-id-input"
-            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 mb-4"
-            placeholder="Enter your ID or Country (e.g., USA, Delegate #5)" maxlength="10">
+        <p class="mb-4 text-sm text-gray-500">
+            Enter your **message** to broadcast an instant update.
+        </p>
 
         <textarea id="message-input" rows="4"
             class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 resize-none mb-6"
@@ -40,11 +41,11 @@
             <div class="flex space-x-4">
                 <button onclick="sendVote('yay')"
                     class="flex-1 bg-green-500 hover:bg-green-600 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 transform active:scale-95 text-xl">
-                    ✅ YAY (Agree)
+                    ✅ YAY
                 </button>
                 <button onclick="sendVote('nay')"
                     class="flex-1 bg-red-500 hover:bg-red-600 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95 text-xl">
-                    ❌ NAY (Disagree)
+                    ❌ NAY
                 </button>
             </div>
         </div>
@@ -55,32 +56,27 @@
     <script>
         // Connect to the SocketIO server.
         const socket = io();
-        const idElement = document.getElementById('delegate-id-input');
+        // Get the ID directly from the HTML rendered by Flask
+        const delegateId = document.getElementById('delegate-id-display').textContent.trim();
         const inputElement = document.getElementById('message-input');
         const feedbackElement = document.getElementById('feedback-message');
 
         socket.on('connect', () => {
-            console.log('Delegate connected to server.');
+            console.log(`Delegate [${delegateId}] connected to server.`);
         });
 
-        // --- Function for sending a text message (EXISTING) ---
+        // --- Function for sending a text message (UPDATED) ---
         function sendMessage() {
-            const delegateId = idElement.value.trim();
             const message = inputElement.value.trim();
-
-            if (delegateId === "") {
-                setFeedback("Please enter your ID/Country.", 'red');
-                return;
-            }
 
             if (message === "") {
                 setFeedback("Please enter a message.", 'red');
                 return;
             }
 
-            // Emit the 'delegate_message' event with the payload
+            // Emit the 'delegate_message' event with the fixed delegate ID
             socket.emit('delegate_message', {
-                delegate_id: delegateId, // Pass the new ID
+                delegate_id: delegateId,
                 message: message
             });
 
@@ -89,16 +85,9 @@
             inputElement.value = ''; // Clear message input after sending
         }
 
-        // --- Function for sending a vote (NEW) ---
+        // --- Function for sending a vote (UPDATED) ---
         function sendVote(voteType) {
-            const delegateId = idElement.value.trim();
-
-            if (delegateId === "") {
-                setFeedback("Please enter your ID/Country before voting.", 'red');
-                return;
-            }
-
-            // Emit the 'delegate_vote' event
+            // Emit the 'delegate_vote' event with the fixed delegate ID
             socket.emit('delegate_vote', {
                 delegate_id: delegateId,
                 vote: voteType // 'yay' or 'nay'
@@ -109,7 +98,7 @@
             setFeedback(`Vote "${voteText}" sent from [${delegateId}]!`, 'green');
         }
 
-        // --- Helper function for cleaner feedback (UPDATED) ---
+        // --- Helper function for cleaner feedback (NO CHANGE) ---
         function setFeedback(message, color) {
             feedbackElement.textContent = message;
             feedbackElement.classList.remove('text-green-500', 'text-red-500');

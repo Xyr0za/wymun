@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delegate Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white p-8 md:p-10 rounded-xl shadow-xl w-full max-w-sm">
+        <h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">
+            Delegate Sign-In
+        </h1>
+
+        <form method="POST">
+            <p class="mb-4 text-sm text-gray-500">
+                Enter your **Delegate PIN** to access the live input.
+            </p>
+
+            <input type="password" name="pin"
+                class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 mb-4 text-center text-xl tracking-wider"
+                placeholder="••••" maxlength="4" required>
+
+            <button type="submit"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 transform active:scale-95">
+                Sign In
+            </button>
+        </form>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="mt-4 text-center">
+                {% for category, message in messages %}
+                    <li class="text-sm {% if category == 'error' %}text-red-500{% else %}text-green-500{% endif %} font-medium">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+    </div>
+</body>
+</html>
