@@ -11,16 +11,16 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+<body class="bg-[#F5F5F7] min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-white p-8 md:p-10 rounded-xl shadow-xl w-full max-w-lg">
-        <h1 class="text-3xl font-bold text-blue-600 mb-2 text-center">
+    <div class="bg-white p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-lg border-t-4 border-[#478E99]">
+        <h1 class="text-3xl font-bold text-[#0B2447] mb-2 text-center">
             Delegate Live Input
         </h1>
 
         <div class="text-lg font-bold text-gray-700 mb-6 text-center">
-            Logged in as: <span id="delegate-id-display" class="text-blue-700">{{ delegate_id }}</span>
-            <a href="{{ url_for('logout') }}" class="text-xs text-red-500 hover:text-red-700 ml-3 font-normal align-top">Logout</a>
+            Logged in as: <span id="delegate-id-display" class="text-[#478E99]">{{ delegate_id }}</span>
+            <a href="{{ url_for('logout') }}" class="text-xs text-red-600 hover:text-red-800 ml-3 font-normal align-top">Logout</a>
         </div>
 
         <p class="mb-4 text-sm text-gray-500">
@@ -28,11 +28,11 @@
         </p>
 
         <textarea id="message-input" rows="4"
-            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 resize-none mb-6"
+            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99] resize-none mb-6"
             placeholder="Enter live update message here..."></textarea>
 
         <button onclick="sendMessage()"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 transform active:scale-95 mb-6">
+            class="w-full bg-[#0B2447] hover:bg-[#1E3A5F] text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-[#6B7280] transform active:scale-95 mb-6">
             Send Live Update
         </button>
 
@@ -40,11 +40,11 @@
             <h2 class="text-xl font-bold text-gray-700 mb-4 text-center">Cast a Vote</h2>
             <div class="flex space-x-4">
                 <button onclick="sendVote('yay')"
-                    class="flex-1 bg-green-500 hover:bg-green-600 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 transform active:scale-95 text-xl">
+                    class="flex-1 bg-green-600 hover:bg-green-700 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 transform active:scale-95 text-xl">
                     ✅ YAY
                 </button>
                 <button onclick="sendVote('nay')"
-                    class="flex-1 bg-red-500 hover:bg-red-600 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95 text-xl">
+                    class="flex-1 bg-red-600 hover:bg-red-700 text-white font-extrabold py-4 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95 text-xl">
                     ❌ NAY
                 </button>
             </div>
@@ -101,8 +101,8 @@
         // --- Helper function for cleaner feedback (NO CHANGE) ---
         function setFeedback(message, color) {
             feedbackElement.textContent = message;
-            feedbackElement.classList.remove('text-green-500', 'text-red-500');
-            feedbackElement.classList.add(color === 'green' ? 'text-green-500' : 'text-red-500');
+            feedbackElement.classList.remove('text-green-600', 'text-red-600');
+            feedbackElement.classList.add(color === 'green' ? 'text-green-600' : 'text-red-600');
 
             // Clear feedback after a short delay
             setTimeout(() => {

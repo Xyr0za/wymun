@@ -10,10 +10,10 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+<body class="bg-[#F5F5F7] min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-white p-8 md:p-10 rounded-xl shadow-xl w-full max-w-sm">
-        <h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">
+    <div class="bg-white p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-sm border-t-4 border-[#0B2447]">
+        <h1 class="text-3xl font-bold text-[#0B2447] mb-6 text-center">
             Delegate Sign-In
         </h1>
 
@@ -23,11 +23,11 @@
             </p>
 
             <input type="password" name="pin"
-                class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500 mb-4 text-center text-xl tracking-wider"
+                class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99] mb-4 text-center text-xl tracking-wider"
                 placeholder="•••••" maxlength="5" required>
 
             <button type="submit"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 transform active:scale-95">
+                class="w-full bg-[#0B2447] hover:bg-[#1E3A5F] text-white font-semibold py-3 px-4 rounded-xl transition duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-[#6B7280] transform active:scale-95">
                 Sign In
             </button>
         </form>
@@ -36,7 +36,7 @@
             {% if messages %}
                 <ul class="mt-4 text-center">
                 {% for category, message in messages %}
-                    <li class="text-sm {% if category == 'error' %}text-red-500{% else %}text-green-500{% endif %} font-medium">{{ message }}</li>
+                    <li class="text-sm {% if category == 'error' %}text-red-600{% else %}text-green-600{% endif %} font-medium">{{ message }}</li>
                 {% endfor %}
                 </ul>
             {% endif %}

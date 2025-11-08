@@ -11,17 +11,17 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+<body class="bg-[#F5F5F7] min-h-screen p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto">
 
-        <header class="flex justify-between items-center mb-6 pb-4 border-b-2 border-red-500">
-            <h1 class="text-4xl font-extrabold text-red-600">
+        <header class="flex justify-between items-center mb-6 pb-4 border-b-2 border-red-600">
+            <h1 class="text-4xl font-extrabold text-red-700">
                 ⚠️ Admin Live Stream Control ⚠️
             </h1>
             <div>
                 <span class="text-md font-semibold text-gray-700 mr-4">Logged in as: ADMIN</span>
-                <a href="{{ url_for('logout') }}" class="text-sm text-blue-500 hover:text-blue-700 font-medium">Logout</a>
+                <a href="{{ url_for('logout') }}" class="text-sm text-[#478E99] hover:text-[#0B2447] font-medium">Logout</a>
             </div>
         </header>
 
@@ -30,9 +30,9 @@
                 <ul class="mb-4">
                     {% for category, message in messages %}
                         <li class="p-3 mb-2 rounded font-medium
-                            {% if category == 'error' %} bg-red-100 text-red-800 border-l-4 border-red-500
-                            {% elif category == 'info' %} bg-blue-100 text-blue-800 border-l-4 border-blue-500
-                            {% else %} bg-green-100 text-green-800 border-l-4 border-green-500
+                            {% if category == 'error' %} bg-red-100 text-red-800 border-l-4 border-red-600
+                            {% elif category == 'info' %} bg-blue-100 text-blue-800 border-l-4 border-[#478E99]
+                            {% else %} bg-green-100 text-green-800 border-l-4 border-green-600
                             {% endif %}">
                             {{ message }}
                         </li>
@@ -45,7 +45,7 @@
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Stream Management</h2>
             <form action="{{ url_for('clear_stream') }}" method="POST" onsubmit="return confirm('Are you sure you want to CLEAR the ENTIRE live stream? This action cannot be undone.');">
                 <button type="submit"
-                    class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95">
+                    class="w-full bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95">
                     Clear All Live Updates (Hard Reset)
                 </button>
             </form>

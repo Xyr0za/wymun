@@ -11,18 +11,18 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4">
+<body class="bg-[#F5F5F7] min-h-screen p-4">
 
-    <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-4xl mx-auto">
-        <h1 class="text-4xl font-extrabold text-indigo-700 mb-6 tracking-tight text-center">
-            Live Update Stream ⚡
+    <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-4xl mx-auto border-t-4 border-[#0B2447]">
+        <h1 class="text-4xl font-extrabold text-[#0B2447] mb-6 tracking-tight text-center">
+            Live Update Stream ✨
         </h1>
 
-        <div class="mb-8 p-4 bg-indigo-50 rounded-lg text-center">
-            <p class="text-sm font-semibold text-indigo-500">Status: <span id="connection-status" class="text-red-500">Connecting...</span></p>
+        <div class="mb-8 p-4 bg-gray-100 rounded-lg text-center">
+            <p class="text-sm font-semibold text-gray-600">Status: <span id="connection-status" class="text-red-600">Connecting...</span></p>
         </div>
 
-        <div class="border-4 border-indigo-200 border-dashed p-4 md:p-6 rounded-xl bg-gray-50 max-h-[70vh] overflow-y-auto">
+        <div class="border-4 border-[#478E99] border-dashed p-4 md:p-6 rounded-xl bg-gray-50 max-h-[70vh] overflow-y-auto">
             <h2 class="text-xl md:text-2xl font-bold text-gray-700 mb-4 text-center sticky top-0 bg-gray-50 py-2">
                 All Delegate Updates
             </h2>
@@ -32,7 +32,7 @@
         </div>
 
         <p class="mt-8 text-gray-500 text-center">
-            Open the <a href="/delegate" class="text-indigo-600 hover:text-indigo-800 font-medium">Delegate Input Page</a> in another window to send updates.
+            Open the <a href="/delegate" class="text-[#478E99] hover:text-[#0B2447] font-medium">Delegate Input Page</a> in another window to send updates.
         </p>
     </div>
 
@@ -45,15 +45,15 @@
         // 1. Handle Connection Status
         socket.on('connect', () => {
             statusElement.textContent = 'Connected';
-            statusElement.classList.remove('text-red-500');
-            statusElement.classList.add('text-green-500');
+            statusElement.classList.remove('text-red-600');
+            statusElement.classList.add('text-green-600');
             console.log('Connected to server!');
         });
 
         socket.on('disconnect', () => {
             statusElement.textContent = 'Disconnected';
-            statusElement.classList.remove('text-green-500');
-            statusElement.classList.add('text-red-500');
+            statusElement.classList.remove('text-green-600');
+            statusElement.classList.add('text-red-600');
         });
 
         // 2. Listen for the 'stream_update' event from the server
