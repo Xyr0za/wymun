@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>MUN Chairman Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
@@ -13,15 +13,15 @@
 </head>
 <body class="bg-[#F5F5F7] min-h-screen p-4 md:p-8">
 
-    <div class="max-w-4xl mx-auto">
+    <div class="max-w-5xl mx-auto">
 
-        <header class="flex justify-between items-center mb-6 pb-4 border-b-2 border-red-600">
-            <h1 class="text-4xl font-extrabold text-red-700">
-                ⚠️ Admin Live Stream Control ⚠️
+        <header class="flex justify-between items-center mb-6 pb-4 border-b-2 border-[#0B2447]">
+            <h1 class="text-4xl font-extrabold text-[#0B2447]">
+                 gavel Chairman Control 👨‍⚖️
             </h1>
             <div>
-                <span class="text-md font-semibold text-gray-700 mr-4">Logged in as: ADMIN</span>
-                <a href="{{ url_for('logout') }}" class="text-sm text-[#478E99] hover:text-[#0B2447] font-medium">Logout</a>
+                <span class="text-md font-semibold text-gray-700 mr-4">Chair: ADMIN</span>
+                <a href="{{ url_for('logout') }}" class="text-sm text-red-600 hover:text-red-800 font-medium">Logout</a>
             </div>
         </header>
 
@@ -41,20 +41,29 @@
             {% endif %}
         {% endwith %}
 
-        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border-t-4 border-red-600">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">Stream Management</h2>
-            <form action="{{ url_for('clear_stream') }}" method="POST" onsubmit="return confirm('Are you sure you want to CLEAR the ENTIRE live stream? This action cannot be undone.');">
-                <button type="submit"
-                    class="w-full bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95">
-                    Clear All Live Updates (Hard Reset)
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-red-600">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Hard Reset</h2>
+                <form action="{{ url_for('clear_stream') }}" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to CLEAR ALL documents? This action cannot be undone.');">
+                    <button type="submit"
+                        class="w-full bg-red-700 hover:bg-red-800 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md focus:outline-none focus:ring-4 focus:ring-red-300 transform active:scale-95">
+                        Clear All Documents (Full System Reset)
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-green-600">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Formal Vote Initiation</h2>
+                <button onclick="initiateVote()"
+                    class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md focus:outline-none focus:ring-4 focus:ring-green-300 transform active:scale-95">
+                    START Formal Vote (Signals Delegates)
                 </button>
-            </form>
+                </div>
         </div>
 
-        <h2 class="text-3xl font-extrabold text-gray-800 mb-4">Live Stream View</h2>
-        <div id="update-stream" class="space-y-4">
-            {{ initial_content | safe }}
-        </div>
+        <h2 class="text-3xl font-extrabold text-gray-800 mb-4">Live Document Review</h2>
+        <div id="update-stream" class="space-y-4 p-4 bg-white rounded-xl shadow-lg border">
+            </div>
 
     </div>
 
@@ -66,10 +75,34 @@
             console.log('Admin connected to server.');
         });
 
-        // Handler to receive the full rendered stream HTML
+        // Handler to receive the full rendered stream HTML for review/moderation
         socket.on('stream_update', (data) => {
+            // The server needs to ensure the HTML sent to the admin includes moderator controls (e.g., delete buttons)
             updateStreamDiv.innerHTML = data.data;
         });
+
+        // --- New Function: Example Moderator Action ---
+        // This function would be triggered by a button rendered inside the stream_update data.
+        function deleteDocument(documentId) {
+            if (confirm(`Are you sure you want to delete document ID: ${documentId}?`)) {
+                socket.emit('moderator_action', {
+                    action: 'delete',
+                    document_id: documentId
+                });
+            }
+        }
+
+        // --- New Function: Initiate Formal Vote ---
+        function initiateVote() {
+             if (confirm('Are you ready to initiate a formal vote? This will be announced to all delegates.')) {
+                // Emit an event the server can use to flag the session as being in a 'voting' state
+                socket.emit('moderator_action', {
+                    action: 'initiate_vote',
+                    // You might include the target resolution ID here
+                });
+                alert('Formal Vote initiated! Delegates can now submit YAY/NAY votes.');
+            }
+        }
 
     </script>
 </body>

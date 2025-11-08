@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Event Dashboard Stream</title>
+    <title>MUN Live Event Stream</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
@@ -15,7 +15,7 @@
 
     <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-4xl mx-auto border-t-4 border-[#0B2447]">
         <h1 class="text-4xl font-extrabold text-[#0B2447] mb-6 tracking-tight text-center">
-            Live Update Stream ✨
+            Diplomatic Document Stream 📜
         </h1>
 
         <div class="mb-8 p-4 bg-gray-100 rounded-lg text-center">
@@ -23,16 +23,16 @@
         </div>
 
         <div class="border-4 border-[#478E99] border-dashed p-4 md:p-6 rounded-xl bg-gray-50 max-h-[70vh] overflow-y-auto">
-            <h2 class="text-xl md:text-2xl font-bold text-gray-700 mb-4 text-center sticky top-0 bg-gray-50 py-2">
-                All Delegate Updates
+            <h2 class="text-xl md:text-2xl font-bold text-gray-700 mb-4 text-center sticky top-0 bg-gray-50 py-2 border-b">
+                Active Resolutions & Amendments
             </h2>
-            <div id="update-stream" class="flex flex-col">
+            <div id="update-stream" class="flex flex-col space-y-4">
                 {{ initial_content }}
-            </div>
+                </div>
         </div>
 
         <p class="mt-8 text-gray-500 text-center">
-            Open the <a href="/delegate" class="text-[#478E99] hover:text-[#0B2447] font-medium">Delegate Input Page</a> in another window to send updates.
+            Open the <a href="/delegate" class="text-[#478E99] hover:text-[#0B2447] font-medium">Delegate Submission Portal</a> in another window to submit documents.
         </p>
     </div>
 
@@ -57,8 +57,9 @@
         });
 
         // 2. Listen for the 'stream_update' event from the server
+        // The server will send a complete, re-rendered HTML block containing all styled documents.
         socket.on('stream_update', function(msg) {
-            console.log('Received updated stream. Total size:', msg.data.length);
+            console.log('Received updated MUN stream.');
 
             // Replace the entire content with the new HTML stream
             streamElement.innerHTML = msg.data;
