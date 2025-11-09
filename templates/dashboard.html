@@ -32,7 +32,12 @@
 
     <script>
         // FIX: Establish SocketIO connection
-        const socket = io();
+        const socket = io({
+            // Prioritize WebSocket transport
+            transports: ['websocket', 'polling'],
+            // Ensure the connection finds the correct endpoint path
+            path: '/socket.io/'
+        });
         const documentStream = document.getElementById('document-stream');
 
         socket.on('connect', function() {

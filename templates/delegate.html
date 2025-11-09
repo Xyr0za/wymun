@@ -103,7 +103,12 @@
     </main>
 
     <script>
-        const socket = io();
+        const socket = io({
+            // Prioritize WebSocket transport
+            transports: ['websocket', 'polling'],
+            // Ensure the connection finds the correct endpoint path
+            path: '/socket.io/'
+        });
         const documentStream = document.getElementById('document-stream');
         const votingPanel = document.getElementById('voting-panel');
         const votePrompt = document.getElementById('vote-prompt');
