@@ -187,6 +187,39 @@ def stream_content_api():
     """Returns the raw HTML content of the document stream for AJAX polling."""
     return render_stream()
 
+@app.route('/vote_status_api')
+def vote_status_api():
+    """Returns the current voting status and tally as JSON."""
+    global current_vote_target_id, current_vote_tally
+
+    if not current_vote_target_id:
+        return json.dumps({
+            'active': False,
+            'target_title': None,
+            'tally': None,
+            'voted': False
+        })
+
+    target_doc = get_document_by_id(current_vote_target_id)
+    target_title = target_doc['title'] if target_doc else "Unknown Document"
+    delegate_id = get_current_user_id()
+
+    # Determine if the current delegate has voted
+    has_voted = delegate_id in current_vote_tally['voters']
+
+    return json.dumps({
+        'active': True,
+        'target_title': target_title,
+        'tally': {
+            'yay': current_vote_tally['yay'],
+            'nay': current_vote_tally['nay'],
+            'abstain': current_vote_tally['abstain'],
+            'voter_count': len(current_vote_tally['voters']),
+            'total_delegates': len(VALID_DELEGATES)
+        },
+        'voted': has_voted
+    })
+
 
 # --- SOCKETIO EVENT HANDLERS ---
 

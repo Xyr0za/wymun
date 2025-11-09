@@ -49,6 +49,15 @@
             <div id="voting-panel" class="bg-indigo-50 p-6 rounded-xl shadow-lg border-t-4 border-indigo-500 hidden">
                 <h2 class="text-xl font-bold text-indigo-800 mb-3">FORMAL VOTE ACTIVE</h2>
                 <p class="text-lg mb-4 text-gray-700" id="vote-prompt">Casting vote on:</p>
+
+                <div id="vote-tally-display" class="bg-indigo-100 p-3 rounded-lg mb-4 text-sm font-semibold text-indigo-700 hidden">
+                    <p class="mb-1">Live Tally (Votes Cast: <span id="voter-count">0</span> / <span id="total-delegates">0</span>)</p>
+                    <div class="flex justify-between">
+                        <span class="text-green-700">YAY: <span id="tally-yay">0</span></span>
+                        <span class="text-red-700">NAY: <span id="tally-nay">0</span></span>
+                        <span class="text-gray-700">ABSTAIN: <span id="tally-abstain">0</span></span>
+                    </div>
+                </div>
                 <div class="flex space-x-3">
                     <button onclick="submitVote('yay')" id="yay-btn"
                         class="flex-1 bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-400">
@@ -98,7 +107,7 @@
             </form>
         </section>
 
-        </main>
+    </main>
 
     <script>
         const socket = io({
@@ -111,35 +120,90 @@
         const votePrompt = document.getElementById('vote-prompt');
         const yayBtn = document.getElementById('yay-btn');
         const nayBtn = document.getElementById('nay-btn');
-        // Get the new button
         const abstainBtn = document.getElementById('abstain-btn');
+
+        // New Tally Display Elements
+        const totalDelegatesSpan = document.getElementById('total-delegates');
+        const voterCountSpan = document.getElementById('voter-count');
+        const tallyYaySpan = document.getElementById('tally-yay');
+        const tallyNaySpan = document.getElementById('tally-nay');
+        const tallyAbstainSpan = document.getElementById('tally-abstain');
+        const voteTallyDisplay = document.getElementById('vote-tally-display');
+
+
+        // --- New AJAX Polling Function ---
+        function pollVoteStatus() {
+            fetch('/vote_status_api')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.active) {
+                        // Display the voting panel
+                        votingPanel.classList.remove('hidden');
+                        votePrompt.textContent = `Casting vote on: ${data.target_title}`;
+                        voteTallyDisplay.classList.remove('hidden');
+
+                        // Update the live tally display
+                        tallyYaySpan.textContent = data.tally.yay;
+                        tallyNaySpan.textContent = data.tally.nay;
+                        tallyAbstainSpan.textContent = data.tally.abstain;
+                        voterCountSpan.textContent = data.tally.voter_count;
+                        totalDelegatesSpan.textContent = data.tally.total_delegates;
+
+                        // Disable buttons if the delegate has already voted
+                        if (data.voted) {
+                            yayBtn.disabled = true;
+                            nayBtn.disabled = true;
+                            abstainBtn.disabled = true;
+                        } else {
+                            yayBtn.disabled = false;
+                            nayBtn.disabled = false;
+                            abstainBtn.disabled = false;
+                        }
+
+                    } else {
+                        // Hide the voting panel if no vote is active
+                        votingPanel.classList.add('hidden');
+                        voteTallyDisplay.classList.add('hidden');
+                    }
+                })
+                .catch(error => console.error('Error polling vote status:', error));
+        }
+
+        // Start polling every 2 seconds
+        setInterval(pollVoteStatus, 2000);
+
+        // Run once immediately on load
+        pollVoteStatus();
 
 
         // --- SocketIO Handlers ---
 
         socket.on('connect', function() {
             console.log('Connected to server.');
+            // Check vote status immediately on connection
+            pollVoteStatus();
         });
 
         // REMOVED: socket.on('stream_update') - no longer needed for delegate view
 
         socket.on('feedback', function(msg) {
             displayFlashMessage(msg.message, 'info');
+            // Force a poll update after receiving feedback (e.g., successful vote)
+            pollVoteStatus();
         });
 
-        // New Voting Listeners
+        // The 'vote_started' and 'vote_ended' handlers are largely superseded by polling,
+        // but we keep vote_ended to display the flash message.
         socket.on('vote_started', function(data) {
-            votePrompt.textContent = `Casting vote on: ${data.target}`;
-            votingPanel.classList.remove('hidden');
-            yayBtn.disabled = false;
-            nayBtn.disabled = false;
-            abstainBtn.disabled = false; // Enable the new button
+             // The panel visibility and button state are now controlled by pollVoteStatus()
+             displayFlashMessage(`A formal vote has started on: ${data.target}`, 'info');
         });
 
         socket.on('vote_ended', function() {
-            votingPanel.classList.add('hidden');
+            // The panel is hidden by the polling function
             displayFlashMessage('The formal vote has concluded. Result published to stream.', 'info');
         });
+
 
         // --- Form Submission Logic ---
 
@@ -167,7 +231,9 @@
                     type: 'vote',
                     vote: voteType
                 });
-                // Disable all buttons after voting
+                // The buttons will be disabled automatically when pollVoteStatus runs again
+                // based on the server's response, but we can preemptively disable them
+                // for immediate visual feedback.
                 yayBtn.disabled = true;
                 nayBtn.disabled = true;
                 abstainBtn.disabled = true;
