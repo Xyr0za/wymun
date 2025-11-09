@@ -56,7 +56,17 @@ def render_stream():
         elif doc['type'] == 'amendment':
             bg_class = 'bg-yellow-50 border-yellow-500'
         elif doc['type'] == 'vote_result':
-            bg_class = 'bg-green-100 border-green-700'
+            # --- MODIFICATION START ---
+            # Check the content for the result status
+            if 'Result: PASSED' in doc.get('content', ''):
+                bg_class = 'bg-green-100 border-green-700'
+            elif 'Result: FAILED' in doc.get('content', ''):
+                # Apply red styling for failed votes
+                bg_class = 'bg-red-100 border-red-700'
+            else:
+                # Default for vote_result if content is unexpected
+                bg_class = 'bg-gray-100 border-gray-500'
+            # --- MODIFICATION END ---
         elif doc['type'] == 'moderator_announcement':
             bg_class = 'bg-red-50 border-red-500'
 
