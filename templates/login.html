@@ -3,28 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MUN Login</title>
+    <title>MUN System Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
     </style>
-</head>
-<body class="bg-[#F5F5F7] min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-white p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-sm border-t-4 border-[#0B2447]">
-        <h1 class="text-3xl font-bold text-[#0B2447] mb-6 text-center">
-            MUN System Login
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mun-dark-bg': '#121212',       // Very dark background
+                        'mun-card': '#1F2937',          // Dark Card (Slate-900 equivalent)
+                        'mun-primary': '#478E99',       // Accent color for primary actions
+                        'mun-secondary': '#A0AEC0',     // Light gray for subtle text
+                        'mun-light-text': '#F3F4F6',    // Near white text
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-mun-dark-bg min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-mun-card p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-sm md:max-w-md border-t-4 border-mun-primary">
+
+        <h1 class="text-3xl font-extrabold text-mun-light-text mb-2 text-center">
+            Delegate Login
         </h1>
+        <p class="text-center text-mun-secondary mb-6 text-base">Access your MUN control panel.</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <ul class="mb-4">
+                <ul class="mb-5">
                     {% for category, message in messages %}
-                        <li class="p-3 mb-2 rounded font-medium
-                            {% if category == 'error' %} bg-red-100 text-red-800 border-l-4 border-red-600
-                            {% elif category == 'info' %} bg-blue-100 text-blue-800 border-l-4 border-[#478E99]
-                            {% else %} bg-green-100 text-green-800 border-l-4 border-green-600
+                        <li class="p-3 mb-2 rounded-lg font-medium text-sm
+                            {% if category == 'error' %} bg-red-800 text-white border-l-4 border-red-500
+                            {% elif category == 'info' %} bg-mun-primary/30 text-mun-light-text border-l-4 border-mun-primary
+                            {% else %} bg-green-800 text-white border-l-4 border-green-500
                             {% endif %}">
                             {{ message }}
                         </li>
@@ -34,23 +52,23 @@
         {% endwith %}
 
         <form method="POST" action="{{ url_for('login') }}">
-            <div class="mb-6">
-                <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
+            <div class="mb-7">
+                <label for="username" class="block text-sm font-semibold text-mun-light-text mb-2">
                     Enter Your Delegate ID or ADMIN
                 </label>
                 <input type="text" id="username" name="username" required
-                    class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99]"
+                    class="w-full p-3 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-xl focus:ring-2 focus:ring-mun-primary focus:border-mun-primary transition duration-150 ease-in-out placeholder-gray-400"
                     placeholder="e.g., UK, FRANCE, ADMIN" autocomplete="off">
             </div>
 
             <button type="submit"
-                class="w-full bg-[#0B2447] hover:bg-[#1E3A5F] text-white font-semibold py-3 rounded-xl transition duration-200 shadow-lg transform active:scale-95">
+                class="w-full bg-mun-primary hover:bg-[#68B7C1] text-mun-dark-bg font-bold tracking-wide py-3 rounded-xl transition duration-300 shadow-md hover:shadow-lg transform active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-mun-primary/50">
                 Log In
             </button>
         </form>
 
-        <p class="mt-6 text-center text-sm text-gray-500">
-            For public viewing: <a href="{{ url_for('dashboard') }}" class="text-[#478E99] hover:text-[#0B2447] font-medium">Live Dashboard</a>
+        <p class="mt-8 text-center text-sm text-mun-secondary">
+            For public viewing: <a href="{{ url_for('dashboard') }}" class="text-mun-primary hover:text-mun-light-text font-bold transition duration-150 underline-offset-4 hover:underline">Live Dashboard</a>
         </p>
     </div>
 

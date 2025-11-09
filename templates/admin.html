@@ -8,19 +8,36 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
-        .sidebar { background-color: #0B2447; }
-        .header { border-bottom: 2px solid #D1D5DB; }
+        /* Define Dark Theme Colors */
+        :root {
+            --mun-primary: #D32F2F;        /* Admin Red Accent */
+            --mun-dark-bg: #121212;        /* Very dark background */
+            --mun-card: #1F2937;           /* Dark Card (Slate-900 equivalent) */
+            --mun-light-text: #F3F4F6;     /* Near white text */
+            --mun-secondary-text: #A0AEC0; /* Light gray for subtle text */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--mun-dark-bg);
+            color: var(--mun-light-text);
+        }
+        .header {
+            background-color: var(--mun-card);
+            border-bottom: 2px solid #374151; /* Dark border */
+        }
         textarea { resize: none; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
 
-    <header class="header bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
-        <h1 class="text-2xl font-bold text-[#D32F2F]">Admin Portal ({{ delegate_id }})</h1>
+    <header class="header shadow-lg p-4 flex justify-between items-center sticky top-0 z-10">
+        <h1 class="text-2xl font-bold text-mun-primary">Admin Portal ({{ delegate_id }})</h1>
         <div class="flex items-center space-x-4">
-            <a href="{{ url_for('dashboard') }}" target="_blank" class="text-sm font-medium text-gray-600 hover:text-red-600 transition">View Dashboard</a>
-            <a href="{{ url_for('logout') }}" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Logout</a>
+            <a href="{{ url_for('dashboard') }}" target="_blank"
+               class="text-sm font-medium text-mun-secondary-text hover:text-mun-primary transition">View Dashboard</a>
+            <a href="{{ url_for('logout') }}"
+               class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold">Logout</a>
         </div>
     </header>
 
@@ -34,9 +51,9 @@
                         <ul class="space-y-2">
                             {% for category, message in messages %}
                                 <li class="p-3 rounded-lg font-medium border-l-4
-                                    {% if category == 'error' %} bg-red-100 text-red-800 border-red-600
-                                    {% elif category == 'info' %} bg-blue-100 text-blue-800 border-blue-600
-                                    {% else %} bg-green-100 text-green-800 border-green-600
+                                    {% if category == 'error' %} bg-red-800 text-white border-red-500
+                                    {% elif category == 'info' %} bg-blue-800 text-white border-blue-500
+                                    {% else %} bg-green-800 text-white border-green-500
                                     {% endif %}" id="flash-{{ loop.index }}">
                                     {{ message }}
                                 </li>
@@ -46,43 +63,43 @@
                 {% endwith %}
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-[#D32F2F] space-y-4">
-                <h2 class="text-xl font-bold text-[#D32F2F]">Chairman Actions</h2>
+            <div class="bg-mun-card p-6 rounded-xl shadow-xl border-t-4 border-mun-primary space-y-4">
+                <h2 class="text-xl font-bold text-mun-primary">Chairman Actions</h2>
                 <button onclick="clearStream()"
-                    class="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition duration-150">
+                    class="w-full bg-gray-600 hover:bg-gray-500 text-white font-semibold py-3 rounded-lg transition duration-150">
                     Clear Document Stream
                 </button>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-[#D32F2F]">
-                <h2 class="text-xl font-bold text-[#D32F2F] mb-4">Post Announcement</h2>
+            <div class="bg-mun-card p-6 rounded-xl shadow-xl border-t-4 border-mun-primary">
+                <h2 class="text-xl font-bold text-mun-primary mb-4">Post Announcement</h2>
                 <textarea id="announcement-content" rows="3"
-                    class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-[#D32F2F] focus:ring-[#D32F2F]"
+                    class="w-full p-2 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-lg focus:border-mun-primary focus:ring-mun-primary"
                     placeholder="Type official announcement here..."></textarea>
                 <button onclick="postAnnouncement()"
-                    class="mt-3 w-full bg-[#D32F2F] hover:bg-[#B71C1C] text-white font-semibold py-3 rounded-lg transition duration-150">
+                    class="mt-3 w-full bg-mun-primary hover:bg-[#A82323] text-white font-semibold py-3 rounded-lg transition duration-150 transform active:scale-95">
                     Post to Stream
                 </button>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-600">
-                <h2 class="text-xl font-bold text-indigo-800 mb-4">Formal Vote Control</h2>
+            <div class="bg-mun-card p-6 rounded-xl shadow-xl border-t-4 border-indigo-500">
+                <h2 class="text-xl font-bold text-indigo-400 mb-4">Formal Vote Control</h2>
 
                 {% if current_vote_target %}
-                    <div id="vote-active-status" class="p-4 bg-yellow-100 border-l-4 border-yellow-500 mb-4">
-                        <p class="font-bold text-yellow-800">VOTE IN PROGRESS:</p>
-                        <p class="text-sm text-yellow-700">{{ current_vote_target.title }}</p>
+                    <div id="vote-active-status" class="p-4 bg-yellow-800/50 border-l-4 border-yellow-500 mb-4">
+                        <p class="font-bold text-yellow-300">VOTE IN PROGRESS:</p>
+                        <p class="text-sm text-yellow-200">{{ current_vote_target.title }}</p>
                     </div>
                 {% else %}
-                    <div id="vote-active-status" class="p-4 bg-green-100 border-l-4 border-green-500 mb-4">
-                        <p class="font-bold text-green-800">NO VOTE ACTIVE</p>
+                    <div id="vote-active-status" class="p-4 bg-green-800/50 border-l-4 border-green-500 mb-4">
+                        <p class="font-bold text-green-300">NO VOTE ACTIVE</p>
                     </div>
                 {% endif %}
 
                 <div id="vote-selection-controls" class="space-y-4">
-                    <label for="vote_target_id" class="block text-sm font-medium text-gray-700 mb-2">Select Document to Vote On:</label>
+                    <label for="vote_target_id" class="block text-sm font-medium text-mun-light-text mb-2">Select Document to Vote On:</label>
                     <select id="vote_target_id" name="vote_target_id"
-                        class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-indigo-600"
+                        class="w-full p-2 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-lg focus:border-indigo-500 focus:ring-indigo-500"
                         {% if current_vote_target %} disabled {% endif %}>
                         <option value="">-- Select a Resolution/Amendment --</option>
                         {% for doc in votable_docs %}
@@ -95,20 +112,20 @@
                     </select>
 
                     <button onclick="startVote()" id="start-vote-btn"
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg transition duration-150 transform active:scale-95 disabled:bg-gray-400"
+                        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-lg transition duration-150 transform active:scale-95 disabled:bg-gray-600 disabled:text-gray-400"
                         {% if current_vote_target %} disabled {% endif %}>
                         START FORMAL VOTE
                     </button>
                 </div>
 
                 <div id="vote-finalization-controls" class="mt-6 space-y-4 hidden">
-                    <h3 class="text-lg font-bold text-indigo-800">Finalize Vote</h3>
-                    <div id="vote-tally" class="p-4 bg-indigo-50 rounded-lg">
-                        <p class="font-bold text-md text-indigo-800 mb-2">Live Vote Status:</p>
-                        <p>Votes Cast: <span id="voter-count" class="font-bold text-indigo-600">0</span> / <span id="total-delegates-count">{{ VALID_DELEGATES|length }}</span></p>
+                    <h3 class="text-lg font-bold text-indigo-400">Finalize Vote</h3>
+                    <div id="vote-tally" class="p-4 bg-[#2a3749] rounded-lg">
+                        <p class="font-bold text-md text-mun-light-text mb-2">Live Vote Status:</p>
+                        <p class="text-mun-secondary-text">Votes Cast: <span id="voter-count" class="font-bold text-indigo-400">0</span> / <span id="total-delegates-count">{{ VALID_DELEGATES|length }}</span></p>
                     </div>
                     <button onclick="finalizeVote()" id="finalize-vote-btn"
-                        class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition duration-150 transform active:scale-95">
+                        class="w-full bg-mun-primary hover:bg-[#A82323] text-white font-semibold py-3 rounded-lg transition duration-150 transform active:scale-95">
                         FINALIZE VOTE & PUBLISH RESULT
                     </button>
                 </div>
@@ -116,15 +133,16 @@
 
         </section>
 
-        <section class="w-2/3 bg-white p-6 rounded-xl shadow-lg">
-            <h2 class="text-2xl font-bold text-[#0B2447] mb-4 border-b pb-2">Live Document Stream (View Only)</h2>
-            <div id="document-stream" class="h-[75vh] overflow-y-auto pr-2">
+        <section class="w-2/3 bg-mun-card p-6 rounded-xl shadow-xl">
+            <h2 class="text-2xl font-bold text-mun-light-text mb-4 border-b border-gray-600 pb-2">Live Document Stream (View Only)</h2>
+            <div id="document-stream" class="h-[75vh] overflow-y-auto pr-2 text-mun-light-text">
                 </div>
         </section>
 
     </main>
 
     <script>
+        // ... (The original JavaScript is inserted here, unchanged)
         const socket = io({
             // Prioritize WebSocket transport
             transports: ['websocket', 'polling'],
@@ -260,8 +278,8 @@
         }
 
         function showFinalizationControls(title) {
-            voteActiveStatus.className = 'p-4 bg-yellow-100 border-l-4 border-yellow-500 mb-4';
-            voteActiveStatus.innerHTML = `<p class="font-bold text-yellow-800">VOTE IN PROGRESS:</p><p class="text-sm text-yellow-700">${title}</p>`;
+            voteActiveStatus.className = 'p-4 bg-yellow-800/50 border-l-4 border-yellow-500 mb-4';
+            voteActiveStatus.innerHTML = `<p class="font-bold text-yellow-300">VOTE IN PROGRESS:</p><p class="text-sm text-yellow-200">${title}</p>`;
 
             voteFinalizationControls.classList.remove('hidden');
             startVoteBtn.disabled = true;
@@ -269,8 +287,8 @@
         }
 
         function hideFinalizationControls() {
-            voteActiveStatus.className = 'p-4 bg-green-100 border-l-4 border-green-500 mb-4';
-            voteActiveStatus.innerHTML = `<p class="font-bold text-green-800">NO VOTE ACTIVE</p>`;
+            voteActiveStatus.className = 'p-4 bg-green-800/50 border-l-4 border-green-500 mb-4';
+            voteActiveStatus.innerHTML = `<p class="font-bold text-green-300">NO VOTE ACTIVE</p>`;
 
             voteFinalizationControls.classList.add('hidden');
             startVoteBtn.disabled = false;
@@ -285,9 +303,11 @@
             element.className = `p-3 rounded-lg font-medium border-l-4 my-2 transition duration-500 opacity-0`;
 
             if (category === 'error') {
-                element.classList.add('bg-red-100', 'text-red-800', 'border-red-600');
+                element.classList.add('bg-red-800', 'text-white', 'border-red-500');
+            } else if (category === 'info') {
+                 element.classList.add('bg-blue-800', 'text-white', 'border-blue-500');
             } else {
-                element.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-600');
+                 element.classList.add('bg-green-800', 'text-white', 'border-green-500');
             }
 
             element.textContent = message;

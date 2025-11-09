@@ -8,19 +8,36 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
-        .sidebar { background-color: #0B2447; }
-        .header { border-bottom: 2px solid #D1D5DB; }
+        /* Define Dark Theme Colors */
+        :root {
+            --mun-primary: #478E99;
+            --mun-dark-bg: #121212;
+            --mun-card: #1F2937;
+            --mun-light-text: #F3F4F6;
+            --mun-secondary-text: #A0AEC0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--mun-dark-bg);
+            color: var(--mun-light-text);
+        }
+        .header {
+            background-color: var(--mun-card);
+            border-bottom: 2px solid #374151; /* Dark border */
+        }
         textarea { resize: none; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
 
-    <header class="header bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
-        <h1 class="text-2xl font-bold text-[#0B2447]">Delegate Portal ({{ delegate_id }})</h1>
+    <header class="header shadow-lg p-4 flex justify-between items-center sticky top-0 z-10">
+        <h1 class="text-2xl font-bold text-mun-primary">Delegate Portal ({{ delegate_id }})</h1>
         <div class="flex items-center space-x-4">
-            <a href="{{ url_for('dashboard') }}" target="_blank" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition">View Dashboard</a>
-            <a href="{{ url_for('logout') }}" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Logout</a>
+            <a href="{{ url_for('dashboard') }}" target="_blank"
+               class="text-sm font-medium text-mun-secondary-text hover:text-mun-primary transition">View Dashboard</a>
+            <a href="{{ url_for('logout') }}"
+               class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold">Logout</a>
         </div>
     </header>
 
@@ -34,9 +51,9 @@
                         <ul class="space-y-2">
                             {% for category, message in messages %}
                                 <li class="p-3 rounded-lg font-medium border-l-4
-                                    {% if category == 'error' %} bg-red-100 text-red-800 border-red-600
-                                    {% elif category == 'info' %} bg-blue-100 text-blue-800 border-blue-600
-                                    {% else %} bg-green-100 text-green-800 border-green-600
+                                    {% if category == 'error' %} bg-red-800 text-white border-red-500
+                                    {% elif category == 'info' %} bg-mun-primary/30 text-mun-light-text border-mun-primary
+                                    {% else %} bg-green-800 text-white border-green-500
                                     {% endif %}" id="flash-{{ loop.index }}">
                                     {{ message }}
                                 </li>
@@ -46,62 +63,62 @@
                 {% endwith %}
             </div>
 
-            <div id="voting-panel" class="bg-indigo-50 p-6 rounded-xl shadow-lg border-t-4 border-indigo-500 hidden">
-                <h2 class="text-xl font-bold text-indigo-800 mb-3">FORMAL VOTE ACTIVE</h2>
-                <p class="text-lg mb-4 text-gray-700" id="vote-prompt">Casting vote on:</p>
+            <div id="voting-panel" class="bg-[#2a3749] p-6 rounded-xl shadow-xl border-t-4 border-mun-primary hidden">
+                <h2 class="text-xl font-bold text-mun-primary mb-3">FORMAL VOTE ACTIVE</h2>
+                <p class="text-lg mb-4 text-mun-secondary-text" id="vote-prompt">Casting vote on:</p>
 
-                <div id="vote-tally-display" class="bg-indigo-100 p-3 rounded-lg mb-4 text-sm font-semibold text-indigo-700 hidden">
+                <div id="vote-tally-display" class="bg-[#374151] p-3 rounded-lg mb-4 text-sm font-semibold text-mun-light-text hidden">
                     <p class="mb-1">Live Tally (Votes Cast: <span id="voter-count">0</span> / <span id="total-delegates">0</span>)</p>
                     <div class="flex justify-between">
-                        <span class="text-green-700">YAY: <span id="tally-yay">0</span></span>
-                        <span class="text-red-700">NAY: <span id="tally-nay">0</span></span>
-                        <span class="text-gray-700">ABSTAIN: <span id="tally-abstain">0</span></span>
+                        <span class="text-green-400">YAY: <span id="tally-yay">0</span></span>
+                        <span class="text-red-400">NAY: <span id="tally-nay">0</span></span>
+                        <span class="text-gray-400">ABSTAIN: <span id="tally-abstain">0</span></span>
                     </div>
                 </div>
                 <div class="flex space-x-3">
                     <button onclick="submitVote('yay')" id="yay-btn"
-                        class="flex-1 bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-400">
+                        class="flex-1 bg-green-600 hover:bg-green-500 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-500 disabled:text-gray-300">
                         YAY (FOR)
                     </button>
                     <button onclick="submitVote('nay')" id="nay-btn"
-                        class="flex-1 bg-red-600 hover:bg-red-700 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-400">
+                        class="flex-1 bg-red-600 hover:bg-red-500 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-500 disabled:text-gray-300">
                         NAY (AGAINST)
                     </button>
                     <button onclick="submitVote('abstain')" id="abstain-btn"
-                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-400">
+                        class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-500 disabled:text-gray-300">
                         ABSTAIN
                     </button>
                 </div>
             </div>
 
-            <form id="submission-form" class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-[#478E99]">
-                <h2 class="text-xl font-bold text-[#478E99] mb-4">Submit Document</h2>
+            <form id="submission-form" class="bg-mun-card p-6 rounded-xl shadow-xl border-t-4 border-mun-primary">
+                <h2 class="text-xl font-bold text-mun-primary mb-4">Submit Document</h2>
 
                 <div class="mb-4">
-                    <label for="doc_type" class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
+                    <label for="doc_type" class="block text-sm font-medium text-mun-light-text mb-2">Document Type</label>
                     <select id="doc_type" name="doc_type"
-                        class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99]">
+                        class="w-full p-2 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-lg focus:border-mun-primary focus:ring-mun-primary">
                         <option value="resolution">Resolution</option>
                         <option value="amendment">Amendment</option>
                     </select>
                 </div>
 
                 <div class="mb-4">
-                    <label for="title" class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                    <label for="title" class="block text-sm font-medium text-mun-light-text mb-2">Title</label>
                     <input type="text" id="title" name="title" required
-                        class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99]"
+                        class="w-full p-2 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-lg focus:border-mun-primary focus:ring-mun-primary"
                         placeholder="e.g., Draft Resolution 1.1">
                 </div>
 
                 <div class="mb-6">
-                    <label for="content" class="block text-sm font-medium text-gray-700 mb-2">Content / Operative Clauses</label>
+                    <label for="content" class="block text-sm font-medium text-mun-light-text mb-2">Content / Operative Clauses</label>
                     <textarea id="content" name="content" rows="6" required
-                        class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-[#478E99] focus:ring-[#478E99]"
+                        class="w-full p-2 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-lg focus:border-mun-primary focus:ring-mun-primary"
                         placeholder="Type your document content here..."></textarea>
                 </div>
 
                 <button type="submit"
-                    class="w-full bg-[#0B2447] hover:bg-[#1E3A5F] text-white font-semibold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95">
+                    class="w-full bg-mun-primary hover:bg-[#68B7C1] text-mun-card font-semibold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95">
                     Submit Document
                 </button>
             </form>
@@ -110,6 +127,7 @@
     </main>
 
     <script>
+        // ... (The original JavaScript is inserted here, unchanged)
         const socket = io({
             // Prioritize WebSocket transport
             transports: ['websocket', 'polling'],
@@ -246,9 +264,11 @@
             element.className = `p-3 rounded-lg font-medium border-l-4 my-2 transition duration-500 opacity-0`;
 
             if (category === 'error') {
-                element.classList.add('bg-red-100', 'text-red-800', 'border-red-600');
+                element.classList.add('bg-red-800', 'text-white', 'border-red-500'); // Dark Theme Red Error
+            } else if (category === 'info') {
+                 element.classList.add('bg-mun-primary/30', 'text-mun-light-text', 'border-mun-primary'); // Dark Theme Info
             } else {
-                element.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-600');
+                 element.classList.add('bg-green-800', 'text-white', 'border-green-500'); // Dark Theme Success
             }
 
             element.textContent = message;
