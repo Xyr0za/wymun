@@ -2,6 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_socketio import SocketIO, emit
 from datetime import datetime
 import json
+import logging
+
+# Set up basic logging (optional but helpful)
+logging.basicConfig(level=logging.INFO)
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
@@ -30,28 +34,32 @@ def get_current_user_id():
 
 def render_stream():
     """Renders the current state of the document stream into HTML."""
-    # This is simplified. In a real app, you'd use Jinja to render templates here.
-    html_content = '<div class="space-y-4">'
+    # Using Tailwind-like classes for aesthetics
+    html_content = '<div class="space-y-4 font-sans max-w-2xl mx-auto">'
     for doc in reversed(mun_documents):
         # Determine color/style based on type
-        bg_class = 'bg-white border-gray-200'
+        bg_class = 'bg-gray-50 border-gray-300'
         title_tag = 'h3'
+        border_color = 'border-l-4'
+
         if doc['type'] == 'resolution':
-            bg_class = 'bg-blue-50 border-blue-400'
+            bg_class = 'bg-blue-50 border-blue-500'
         elif doc['type'] == 'amendment':
-            bg_class = 'bg-yellow-50 border-yellow-400'
+            bg_class = 'bg-yellow-50 border-yellow-500'
         elif doc['type'] == 'vote_result':
-            bg_class = 'bg-green-100 border-green-600'
+            bg_class = 'bg-green-100 border-green-700'
+        elif doc['type'] == 'moderator_announcement':
+            bg_class = 'bg-red-50 border-red-500'
 
         html_content += f"""
-        <div class="p-4 border-l-4 {bg_class} rounded-md shadow-md">
-            <{title_tag} class="text-lg font-semibold text-gray-800">{doc['title']}</{title_tag}>
+        <div class="p-4 rounded-lg shadow-md {bg_class} {border_color}">
+            <{title_tag} class="text-lg font-bold text-gray-900">{doc['title']}</{title_tag}>
             <p class="text-sm text-gray-600 mt-1">
                 <span class="font-medium text-gray-900">{doc['delegate']}</span> 
                 ({doc['type'].replace('_', ' ').title()}) - 
                 <span class="text-xs text-gray-500">{doc['timestamp']}</span>
             </p>
-            <p class="mt-2 text-gray-700 whitespace-pre-wrap">{doc.get('content', '')}</p>
+            <p class="mt-2 text-gray-700 whitespace-pre-wrap text-base leading-relaxed">{doc.get('content', '')}</p>
         </div>
         """
     html_content += '</div>'
@@ -61,7 +69,6 @@ def render_stream():
 def broadcast_stream():
     """Emits the updated stream to all connected clients."""
     stream_html = render_stream()
-    # FIX 1: Ensure broadcast=True is used to hit all connected dashboards/admins
     socketio.emit('stream_update', {'data': stream_html}, broadcast=True)
 
 
@@ -96,9 +103,13 @@ def login():
 
         else:
             flash('Invalid Delegate ID or Admin code.', 'error')
-            return render_template('login.html')
+            # Fetch flashed messages for rendering
+            messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
+            return render_template('login.html', messages=messages)
 
-    return render_template('login.html')
+    # Fetch flashed messages for GET request (e.g., redirected from index)
+    messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
+    return render_template('login.html', messages=messages)
 
 
 @app.route('/logout')
@@ -114,7 +125,9 @@ def delegate_page():
     if session.get('role') != 'delegate':
         flash('Access denied. Please log in as a delegate.', 'error')
         return redirect(url_for('login'))
-    return render_template('delegate.html', delegate_id=session['user'])
+
+    messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
+    return render_template('delegate.html', delegate_id=session['user'], messages=messages)
 
 
 @app.route('/admin')
@@ -122,7 +135,9 @@ def admin_page():
     if session.get('role') != 'admin':
         flash('Access denied. Please log in as the Administrator.', 'error')
         return redirect(url_for('login'))
-    return render_template('admin.html', delegate_id=session['user'])
+
+    messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
+    return render_template('admin.html', delegate_id=session['user'], messages=messages)
 
 
 @app.route('/dashboard')
@@ -137,10 +152,11 @@ def handle_connect():
     """Handles new client connection."""
     user = get_current_user_id()
     app.logger.info(f'{user} connected.')
+
     # Send the initial stream content immediately upon connection
     emit('stream_update', {'data': render_stream()})
 
-    # Send current vote status on connect (New)
+    # Send current vote status on connect
     global current_vote_target
     if current_vote_target:
         emit('vote_started', {'target': current_vote_target})
@@ -157,7 +173,7 @@ def handle_mun_submission(data):
         emit('feedback', {'message': 'Authentication error.'})
         return
 
-    # --- Vote Submission Handler (FIX 2.A) ---
+    # --- Vote Submission Handler ---
     if submission_type == 'vote':
         global current_vote_target, current_vote_tally
         vote = data.get('vote')
@@ -180,7 +196,8 @@ def handle_mun_submission(data):
                 'target': current_vote_target,
                 'yay': current_vote_tally['yay'],
                 'nay': current_vote_tally['nay'],
-                'voter_count': len(current_vote_tally['voters'])
+                'voter_count': len(current_vote_tally['voters']),
+                'total_delegates': len(VALID_DELEGATES)
             }, broadcast=True)
             return  # Stop here to prevent individual votes from showing in the main stream
 
@@ -199,7 +216,7 @@ def handle_mun_submission(data):
 
         emit('feedback', {'message': f'{submission_type.title()} "{new_doc["title"]}" submitted.'}, broadcast=False)
 
-        # Broadcast the updated stream to all clients (FIX 1)
+        # Broadcast the updated stream to all clients
         broadcast_stream()
         return
 
@@ -224,11 +241,22 @@ def handle_moderator_action(data):
         current_vote_target = target_title
         current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
 
-        flash(f'Formal vote on "{target_title}" has started.', 'info')
         # 2. Announce the vote start to all clients (Delegates need this)
         socketio.emit('vote_started', {'target': target_title}, broadcast=True)
         # 3. Inform Admin directly
         emit('feedback', {'message': f'Formal vote on "{target_title}" started.'})
+
+        # Add a record to the stream that a vote has started
+        new_doc = {
+            'type': 'moderator_announcement',
+            'title': 'VOTE STARTED',
+            'content': f'A formal vote is now open on: {target_title}. All delegates must cast their vote (YAY/NAY).',
+            'delegate': 'CHAIRMAN',
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        mun_documents.append(new_doc)
+        broadcast_stream()
+
 
     elif action == 'finalize_vote':
         global current_vote_target, current_vote_tally
@@ -241,15 +269,23 @@ def handle_moderator_action(data):
         yay = current_vote_tally['yay']
         nay = current_vote_tally['nay']
         total_votes = yay + nay
+
+        # Simple majority rule check (half of VALID_DELEGATES + 1 for passage)
+        # However, for a simple vote, we just check if yay > nay
         result = 'PASSED' if yay > nay else 'FAILED'
 
         # 2. Create the result document
+        voters_list = sorted(list(current_vote_tally['voters']))
+
         result_content = (
-            f"Result: {result}\n\n"
-            f"Yay: {yay}\n"
-            f"Nay: {nay}\n"
-            f"Abstentions/Not Voted: {len(VALID_DELEGATES) - len(current_vote_tally['voters'])}\n"
-            f"Total Votes Cast: {total_votes}"
+            f"VOTE ON: {current_vote_target}\n"
+            f"--- FINAL RESULT ---\n"
+            f"Result: {result} ({'Passed' if result == 'PASSED' else 'Failed'} by simple majority)\n\n"
+            f"Yay Votes: {yay}\n"
+            f"Nay Votes: {nay}\n"
+            f"Total Votes Cast: {total_votes}\n"
+            f"Delegates who Voted: {', '.join(voters_list)}\n"
+            f"Delegates who did NOT Vote: {', '.join(sorted([d for d in VALID_DELEGATES if d not in current_vote_tally['voters']]))}"
         )
         new_doc = {
             'type': 'vote_result',
@@ -273,11 +309,32 @@ def handle_moderator_action(data):
     elif action == 'clear_stream':
         global mun_documents
         mun_documents = []
+        # Also clear vote state just in case
+        global current_vote_target, current_vote_tally
+        current_vote_target = None
+        current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
+        socketio.emit('vote_ended', broadcast=True)
+
         broadcast_stream()
         emit('feedback', {'message': 'Document stream cleared.'})
+
+    elif action == 'announce':
+        # Handles general announcements from the Chair
+        announcement_content = data.get('content', 'Chairman made an announcement.')
+        new_doc = {
+            'type': 'moderator_announcement',
+            'title': 'CHAIRMAN ANNOUNCEMENT',
+            'content': announcement_content,
+            'delegate': 'CHAIRMAN',
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        mun_documents.append(new_doc)
+        broadcast_stream()
+        emit('feedback', {'message': 'Announcement posted to the stream.'})
 
 
 if __name__ == '__main__':
     # Use a high-level logging configuration
     app.logger.setLevel('INFO')
+    # The erroneous `global` statements are removed here
     socketio.run(app, debug=True)
