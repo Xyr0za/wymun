@@ -11,37 +11,42 @@
         body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
     </style>
 </head>
-<body class="p-6">
+<body class="flex flex-col min-h-screen">
 
-    <header class="mb-8 border-b-4 border-[#0B2447] pb-4">
-        <h1 class="text-4xl font-extrabold text-[#0B2447] text-center">
-            UN/GA Emergency Session Live Feed
-        </h1>
-        <p class="text-lg text-gray-600 text-center mt-2">
-            Real-time resolutions, amendments, and vote results.
-        </p>
+    <header class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+        <h1 class="text-3xl font-bold text-gray-800">🏛️ MUN Live Dashboard</h1>
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('index') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Go to Login/Portal</a>
+        </div>
     </header>
 
-    <!-- LIVE STREAM CONTAINER -->
-    <section class="bg-white p-6 rounded-xl shadow-2xl">
-        <h2 class="text-2xl font-bold text-[#478E99] mb-4 border-b pb-2">Document Stream</h2>
-        <div id="document-stream" class="min-h-[70vh] max-h-[85vh] overflow-y-auto pr-2">
-            <!-- Initial content loaded by Flask, subsequent updates via SocketIO -->
-            {{ stream_content | safe }}
-        </div>
-    </section>
+    <main class="flex flex-grow p-6">
+        <section class="w-full bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4 border-b pb-2">Real-Time Document Stream</h2>
+            <p class="text-sm text-gray-500 mb-4">This feed updates instantly when delegates or the Chairman submit new documents or actions.</p>
+            <div id="document-stream" class="h-[80vh] overflow-y-auto pr-2">
+                {{ stream_content | safe }}
+            </div>
+        </section>
+    </main>
 
     <script>
+        // 🔑 CRITICAL FIX: Establish SocketIO connection
         const socket = io();
         const documentStream = document.getElementById('document-stream');
 
-        // FIX 1: Stream Update Listener (Ensures real-time updates)
-        socket.on('stream_update', function(msg) {
-            documentStream.innerHTML = msg.data;
-            documentStream.scrollTop = 0; // Scroll to the top for the newest item
+        socket.on('connect', function() {
+            console.log('Connected to MUN Live Dashboard server.');
         });
 
-        // The dashboard only needs to receive the updates, it does not send data.
+        // 🔑 CRITICAL FIX: Listener for the server broadcast
+        socket.on('stream_update', function(msg) {
+            // Replace the old HTML content with the new rendered stream
+            documentStream.innerHTML = msg.data;
+            // Scroll to the top to see the newest items (since the server renders in reverse)
+            documentStream.scrollTop = 0;
+            console.log('Document stream updated live.');
+        });
     </script>
 </body>
 </html>
