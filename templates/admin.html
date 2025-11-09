@@ -152,23 +152,50 @@
             hideFinalizationControls();
         }
 
+        // --- Polling Logic (NEW) ---
 
-        // --- SocketIO Handlers ---
+        function fetchStreamUpdate() {
+            // Use Fetch API to get the new stream content from the dedicated API endpoint
+            fetch('{{ url_for("stream_content_api") }}')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // Update the stream's HTML content
+                    documentStream.innerHTML = html;
+                    documentStream.scrollTop = 0; // Keep newest items visible
+                    // console.log('Admin Stream updated via AJAX polling.');
+                })
+                .catch(error => console.error('Error fetching admin stream:', error));
+        }
+
+        // Start polling immediately and then every 5 seconds (5000 milliseconds)
+        fetchStreamUpdate();
+        const pollingInterval = setInterval(fetchStreamUpdate, 5000);
+
+        // Clear the interval when the page is unloaded to prevent memory leaks
+        window.addEventListener('beforeunload', () => {
+            clearInterval(pollingInterval);
+        });
+
+        // (END NEW Polling Logic)
+
+        // --- SocketIO Handlers (MODIFIED) ---
 
         socket.on('connect', function() {
             console.log('Connected as Admin.');
         });
 
-        socket.on('stream_update', function(msg) {
-            documentStream.innerHTML = msg.data;
-            documentStream.scrollTop = 0;
-        });
+        // REMOVED: socket.on('stream_update', ...) - SocketIO no longer handles stream updates here
 
         socket.on('feedback', function(msg) {
             displayFlashMessage(msg.message, 'info');
         });
 
-        // NEW: Live Vote Tally Update
+        // Live Vote Tally Update
         socket.on('vote_tally_update', function(data) {
             yayCount.textContent = data.yay;
             nayCount.textContent = data.nay;
@@ -180,7 +207,7 @@
             }
         });
 
-        // NEW: Handles state refresh after vote finalization or stream clear
+        // Handles state refresh after vote finalization or stream clear
         socket.on('admin_state_update', function() {
             // Force a page reload to fetch the new votable_docs list and state
             window.location.reload();
