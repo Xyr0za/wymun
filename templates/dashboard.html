@@ -31,7 +31,7 @@
     </main>
 
     <script>
-        // 🔑 CRITICAL FIX: Establish SocketIO connection
+        // FIX: Establish SocketIO connection
         const socket = io();
         const documentStream = document.getElementById('document-stream');
 
@@ -39,12 +39,10 @@
             console.log('Connected to MUN Live Dashboard server.');
         });
 
-        // 🔑 CRITICAL FIX: Listener for the server broadcast
+        // FIX: Listener for the server broadcast to update the stream element
         socket.on('stream_update', function(msg) {
-            // Replace the old HTML content with the new rendered stream
             documentStream.innerHTML = msg.data;
-            // Scroll to the top to see the newest items (since the server renders in reverse)
-            documentStream.scrollTop = 0;
+            documentStream.scrollTop = 0; // Scroll to the top for the newest item
             console.log('Document stream updated live.');
         });
     </script>

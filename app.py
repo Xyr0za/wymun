@@ -3,8 +3,9 @@ from flask_socketio import SocketIO, emit
 from datetime import datetime
 import json
 import logging
-import uuid  # Import for generating unique IDs
-import time # For robust exponential backoff handling if using external APIs, though not needed here
+import uuid
+import time
+import eventlet  # Required for asynchronous server
 
 # Set up basic logging (optional but helpful)
 logging.basicConfig(level=logging.INFO)
@@ -13,21 +14,17 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 # IMPORTANT: Never use a hardcoded key in production. Load from environment.
 app.config['SECRET_KEY'] = 'A_VERY_SECRET_KEY_FOR_MUN_APP'
-# Configure SocketIO for robust cross-origin handling
-socketio = SocketIO(app, cors_allowed_origins="*")
+# FIX: Configure SocketIO explicitly for eventlet async mode for stability
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Hardcoded roles for simulation
 ADMIN_USER = 'ADMIN'
 VALID_DELEGATES = ['UK', 'FRANCE', 'USA', 'CHINA', 'RUSSIA', 'GERMANY', 'INDIA']
 
 # --- GLOBAL STATE (Database/Firestore stand-in) ---
-# A list to store the chronological event stream
 mun_documents = []
-
-# Vote Tracking State
-# We track voters by their delegate ID to ensure a delegate votes only once.
 current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
-current_vote_target_id = None  # Tracks the ID of the document being voted on
+current_vote_target_id = None
 
 
 # --- UTILITY FUNCTIONS ---
@@ -204,7 +201,6 @@ def handle_connect():
 
 @socketio.on('mun_submission')
 def handle_mun_submission(data):
-
     # Use 'global' keyword to modify the global state variables
     global current_vote_target_id, current_vote_tally
 
@@ -260,7 +256,6 @@ def handle_mun_submission(data):
 
         emit('feedback', {'message': f'{submission_type.title()} "{new_doc["title"]}" submitted.'}, broadcast=False)
 
-        # FIX: Ensure this critical broadcast call updates all clients (including the dashboard)
         broadcast_stream()
         return
 
@@ -388,5 +383,8 @@ def handle_moderator_action(data):
 if __name__ == '__main__':
     # Use a high-level logging configuration
     app.logger.setLevel('INFO')
-    # Run the application using socketio.run, which is required for websocket support
-    socketio.run(app, debug=True)
+
+    # FIX: Run the application using eventlet WSGI server for robust SocketIO performance
+    app.logger.info("Starting MUN app with eventlet server...")
+    # Listen on all external interfaces ('0.0.0.0') for testing across devices
+    eventlet.wsgi.server(eventlet.listen(('', 5000)), app, debug=True)
