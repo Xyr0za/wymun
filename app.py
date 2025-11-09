@@ -199,6 +199,9 @@ def handle_connect():
 
 @socketio.on('mun_submission')
 def handle_mun_submission(data):
+
+    global current_vote_target_id, current_vote_tally
+
     """Handles submissions of resolutions, amendments, and votes."""
 
     submission_type = data.get('type')
@@ -210,7 +213,6 @@ def handle_mun_submission(data):
 
     # --- Vote Submission Handler ---
     if submission_type == 'vote':
-        global current_vote_target_id, current_vote_tally
         vote = data.get('vote')
 
         target_doc = get_document_by_id(current_vote_target_id)
@@ -265,6 +267,7 @@ def handle_mun_submission(data):
 @socketio.on('moderator_action')
 def handle_moderator_action(data):
     """Handles actions specific to the Admin (Chairman) role."""
+    global mun_documents, current_vote_target_id, current_vote_tally
 
     if session.get('role') != 'admin':
         emit('feedback', {'message': 'Unauthorized action.'})
@@ -273,7 +276,6 @@ def handle_moderator_action(data):
     action = data.get('action')
 
     if action == 'start_vote':
-        global current_vote_target_id, current_vote_tally
         target_doc_id = data.get('target_id')
         target_doc = get_document_by_id(target_doc_id)
 
@@ -359,7 +361,6 @@ def handle_moderator_action(data):
 
 
     elif action == 'clear_stream':
-        global mun_documents, current_vote_target_id, current_vote_tally
         mun_documents = []
         # Also clear vote state just in case
         current_vote_target_id = None
