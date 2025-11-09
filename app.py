@@ -5,7 +5,7 @@ import json
 import logging
 import uuid
 import time
-import eventlet  # Still required for the delegate/admin pages' SocketIO functions
+import eventlet
 
 # Set up basic logging (optional but helpful)
 logging.basicConfig(level=logging.INFO)
@@ -18,11 +18,12 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Hardcoded roles for simulation
 ADMIN_USER = 'ADMIN'
-VALID_DELEGATES = ['UK', 'FRANCE', 'USA', 'CHINA', 'RUSSIA', 'GERMANY', 'INDIA']
+VALID_DELEGATES = ['UK', 'FRANCE', 'USA', 'CHINA', 'RUSSIA', 'GERMANY', 'INDIA']  # Updated the original list
 
 # --- GLOBAL STATE (Database/Firestore stand-in) ---
 mun_documents = []
-current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
+# UPDATED: Added 'abstain' to the tally
+current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
 current_vote_target_id = None
 
 
@@ -98,7 +99,7 @@ def broadcast_stream():
     socketio.emit('stream_update', {'data': stream_html}, broadcast=True)
 
 
-# --- ROUTES ---
+# --- ROUTES (No changes here, but kept for context) ---
 
 @app.route('/')
 def index():
@@ -151,6 +152,7 @@ def delegate_page():
         return redirect(url_for('login'))
 
     messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
+    # The delegate.html template no longer needs 'stream_content'
     return render_template('delegate.html', delegate_id=session['user'], messages=messages)
 
 
@@ -194,9 +196,6 @@ def handle_connect():
     user = get_current_user_id()
     app.logger.info(f'{user} connected.')
 
-    # Send the initial stream content immediately upon connection
-    # emit('stream_update', {'data': render_stream()}) # No longer needed for dashboard
-
     # Send current vote status on connect
     global current_vote_target_id
     if current_vote_target_id:
@@ -230,7 +229,8 @@ def handle_mun_submission(data):
             emit('feedback', {'message': 'You have already cast your vote.'})
             return
 
-        if vote in ['yay', 'nay']:
+        # UPDATED: Added 'abstain' to the valid vote options
+        if vote in ['yay', 'nay', 'abstain']:
             current_vote_tally[vote] += 1
             current_vote_tally['voters'].add(delegate_id)
             emit('feedback', {'message': f'Vote recorded: {vote.upper()} on {target_doc["title"]}'})
@@ -241,6 +241,7 @@ def handle_mun_submission(data):
                 'target_title': target_doc['title'],
                 'yay': current_vote_tally['yay'],
                 'nay': current_vote_tally['nay'],
+                'abstain': current_vote_tally['abstain'],  # Added abstain
                 'voter_count': len(current_vote_tally['voters']),
                 'total_delegates': len(VALID_DELEGATES)
             }, broadcast=True)
@@ -262,7 +263,10 @@ def handle_mun_submission(data):
 
         emit('feedback', {'message': f'{submission_type.title()} "{new_doc["title"]}" submitted.'}, broadcast=False)
 
-        broadcast_stream()
+        # Removed broadcast_stream() here as the delegate no longer views the stream,
+        # and the admin/dashboard stream updates are handled via separate calls or polling.
+        # However, we must ensure admin/dashboard still sees the new document.
+        broadcast_stream()  # Keep this to update Admin/Dashboard, but the delegate won't see it.
         return
 
     emit('feedback', {'message': 'Invalid submission type.'})
@@ -288,9 +292,9 @@ def handle_moderator_action(data):
             emit('feedback', {'message': 'Invalid document ID or document type for voting.'})
             return
 
-        # 1. Reset and activate the vote
+        # 1. Reset and activate the vote (UPDATED to include 'abstain')
         current_vote_target_id = target_doc_id
-        current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
+        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
         target_title = target_doc['title']
 
         # 2. Announce the vote start to all clients (Delegates need this)
@@ -302,7 +306,7 @@ def handle_moderator_action(data):
             'id': str(uuid.uuid4()),
             'type': 'moderator_announcement',
             'title': 'VOTE STARTED',
-            'content': f'A formal vote is now open on the **{target_doc["type"].upper()}**: {target_title}. All delegates must cast their vote (YAY/NAY).',
+            'content': f'A formal vote is now open on the **{target_doc["type"].upper()}**: {target_title}. All delegates must cast their vote (YAY/NAY/ABSTAIN).',
             'delegate': 'CHAIRMAN',
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
@@ -322,18 +326,22 @@ def handle_moderator_action(data):
         # 1. Calculate the result
         yay = current_vote_tally['yay']
         nay = current_vote_tally['nay']
-        total_votes = yay + nay
+        abstain = current_vote_tally['abstain']  # Added abstain
+        total_votes = yay + nay + abstain
+        # Result logic based on Yay vs Nay (Abstentions don't count towards the majority)
         result = 'PASSED' if yay > nay else 'FAILED'
 
         # 2. Create the result document
         voters_list = sorted(list(current_vote_tally['voters']))
 
+        # UPDATED: Included abstain in the result content
         result_content = (
             f"VOTE ON: {target_title}\n"
             f"--- FINAL RESULT ---\n"
             f"Result: {result} ({'Passed' if result == 'PASSED' else 'Failed'} by simple majority)\n\n"
             f"Yay Votes: {yay}\n"
             f"Nay Votes: {nay}\n"
+            f"Abstain Votes: {abstain}\n"
             f"Total Votes Cast: {total_votes}\n"
             f"Delegates who Voted: {', '.join(voters_list)}\n"
             f"Delegates who did NOT Vote: {', '.join(sorted([d for d in VALID_DELEGATES if d not in current_vote_tally['voters']]))}"
@@ -348,9 +356,9 @@ def handle_moderator_action(data):
         }
         mun_documents.append(new_doc)
 
-        # 3. Reset the global vote state
+        # 3. Reset the global vote state (UPDATED to include 'abstain')
         current_vote_target_id = None
-        current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
+        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
 
         # 4. Broadcast the new stream and inform clients the vote is over
         broadcast_stream()
@@ -363,7 +371,8 @@ def handle_moderator_action(data):
     elif action == 'clear_stream':
         mun_documents = []
         current_vote_target_id = None
-        current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
+        # UPDATED to include 'abstain'
+        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
         socketio.emit('vote_ended', broadcast=True)
 
         broadcast_stream()
