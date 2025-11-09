@@ -1,3 +1,6 @@
+import eventlet  # Required for asynchronous server
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, get_flashed_messages
 from flask_socketio import SocketIO, emit
 from datetime import datetime
@@ -5,7 +8,7 @@ import json
 import logging
 import uuid
 import time
-import eventlet  # Required for asynchronous server
+
 
 # Set up basic logging (optional but helpful)
 logging.basicConfig(level=logging.INFO)
