@@ -104,12 +104,9 @@
                 <div id="vote-finalization-controls" class="mt-6 space-y-4 hidden">
                     <h3 class="text-lg font-bold text-indigo-800">Finalize Vote</h3>
                     <div id="vote-tally" class="p-4 bg-indigo-50 rounded-lg">
-                        <p class="font-bold text-md text-indigo-800 mb-2">Live Tally:</p>
-                        <p>Yay: <span id="yay-count" class="font-bold text-green-600">0</span></p>
-                        <p>Nay: <span id="nay-count" class="font-bold text-red-600">0</span></p>
-                        <p>Voted: <span id="voter-count" class="font-bold text-indigo-600">0</span> / <span id="total-delegates-count">{{ VALID_DELEGATES|length }}</span></p>
+                        <p class="font-bold text-md text-indigo-800 mb-2">Live Vote Status:</p>
+                        <p>Votes Cast: <span id="voter-count" class="font-bold text-indigo-600">0</span> / <span id="total-delegates-count">{{ VALID_DELEGATES|length }}</span></p>
                     </div>
-
                     <button onclick="finalizeVote()" id="finalize-vote-btn"
                         class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition duration-150 transform active:scale-95">
                         FINALIZE VOTE & PUBLISH RESULT
@@ -140,8 +137,7 @@
         const voteActiveStatus = document.getElementById('vote-active-status');
         const voteSelectionControls = document.getElementById('vote-selection-controls');
         const voteFinalizationControls = document.getElementById('vote-finalization-controls');
-        const yayCount = document.getElementById('yay-count');
-        const nayCount = document.getElementById('nay-count');
+        // Removed yayCount and nayCount
         const voterCount = document.getElementById('voter-count');
 
         // Initial state based on Flask template context
@@ -195,10 +191,10 @@
             displayFlashMessage(msg.message, 'info');
         });
 
-        // Live Vote Tally Update
+        // Live Vote Tally Update (Simplified to only use voter_count)
         socket.on('vote_tally_update', function(data) {
-            yayCount.textContent = data.yay;
-            nayCount.textContent = data.nay;
+            // yayCount.textContent = data.yay; // Removed
+            // nayCount.textContent = data.nay; // Removed
             voterCount.textContent = data.voter_count;
 
             // Ensure finalization controls are visible if a tally comes in
@@ -242,7 +238,9 @@
 
             if (confirm(`Start formal vote on: ${docTitle}?`)) {
                 socket.emit('moderator_action', { action: 'start_vote', target_id: docId });
+                // NEW: Reset and show controls
                 showFinalizationControls(docTitle);
+                resetTallyDisplay();
             }
         }
 
@@ -250,15 +248,16 @@
             if (confirm('Are you SURE you want to finalize the vote and publish the result? Voting will be closed for all delegates.')) {
                 socket.emit('moderator_action', { action: 'finalize_vote' });
                 hideFinalizationControls();
-
-                // Reset live tally display
-                yayCount.textContent = '0';
-                nayCount.textContent = '0';
-                voterCount.textContent = '0';
+                resetTallyDisplay();
             }
         }
 
         // --- UI Control Functions ---
+
+        function resetTallyDisplay() {
+            // Only reset the voter count
+            voterCount.textContent = '0';
+        }
 
         function showFinalizationControls(title) {
             voteActiveStatus.className = 'p-4 bg-yellow-100 border-l-4 border-yellow-500 mb-4';

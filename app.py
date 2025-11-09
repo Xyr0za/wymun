@@ -1,3 +1,5 @@
+import eventlet
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, get_flashed_messages
 from flask_socketio import SocketIO, emit
 from datetime import datetime
@@ -5,7 +7,7 @@ import json
 import logging
 import uuid
 import time
-import eventlet
+
 
 # Set up basic logging (optional but helpful)
 logging.basicConfig(level=logging.INFO)
@@ -386,8 +388,6 @@ def handle_moderator_action(data):
             f"Nay Votes: {nay}\n"
             f"Abstain Votes: {abstain}\n"
             f"Total Votes Cast: {total_votes}\n"
-            f"Delegates who Voted: {', '.join(voters_list)}\n"
-            f"Delegates who did NOT Vote: {', '.join(sorted([d for d in VALID_DELEGATES if d not in current_vote_tally['voters']]))}"
         )
         new_doc = {
             'id': str(uuid.uuid4()),
