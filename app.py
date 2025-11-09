@@ -371,13 +371,12 @@ def handle_mun_submission(data):
             emit('feedback', {'message': f'Vote recorded: {vote.upper()} on {target_doc["title"]}'})
 
             # Broadcast the live tally update to the admin page
-            # 💡 MODIFICATION IS HERE: Simplify the payload for the client
             socketio.emit('vote_tally_update', {
                 'target_id': current_vote_target_id,
                 'target_title': target_doc['title'],
-                # Removed 'yay' and 'nay' keys
-                # 'yay': current_vote_tally['yay'],
-                # 'nay': current_vote_tally['nay'],
+                'yay': current_vote_tally['yay'],
+                'nay': current_vote_tally['nay'],
+                'abstain': current_vote_tally['abstain'],  # Added abstain
                 'voter_count': len(current_vote_tally['voters']),
                 'total_delegates': len(VALID_DELEGATES)
             }, broadcast=True)
