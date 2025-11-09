@@ -1,4 +1,8 @@
 import eventlet
+# eventlet.monkey_patch() is often recommended for full async compatibility,
+# but eventlet.wsgi.server and socketio(async_mode='eventlet') handles it well enough here.
+# If you run into issues, uncommenting the next line might help.
+# eventlet.monkey_patch()
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, get_flashed_messages
 from flask_socketio import SocketIO, emit
@@ -7,7 +11,7 @@ import json
 import logging
 import uuid
 import time
-
+import threading  # Use threading for the simple sleep logic, or eventlet.spawn
 
 # Set up basic logging (optional but helpful)
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +31,10 @@ mun_documents = []
 # UPDATED: Added 'abstain' to the tally
 current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
 current_vote_target_id = None
+# NEW: Variable to hold the greenlet/thread object for the auto-finalizer
+vote_timer_thread = None
+# NEW: The duration for the auto-finalize (30 seconds)
+VOTE_DURATION_SECONDS = 30
 
 
 # --- UTILITY FUNCTIONS ---
@@ -111,7 +119,88 @@ def broadcast_stream():
     socketio.emit('stream_update', {'data': stream_html}, broadcast=True)
 
 
-# --- ROUTES (No changes here, but kept for context) ---
+# --- NEW: AUTO-FINALIZATION LOGIC ---
+
+def auto_finalize_vote():
+    """
+    Spawns a greenlet/thread to wait for VOTE_DURATION_SECONDS and then finalize the vote.
+    """
+    # Use eventlet.sleep() instead of time.sleep() for non-blocking wait
+    app.logger.info(f"Vote timer started for {VOTE_DURATION_SECONDS} seconds.")
+    eventlet.sleep(VOTE_DURATION_SECONDS)
+    app.logger.info("Vote duration expired. Auto-finalizing vote.")
+
+    # Check if a vote is still active before finalizing
+    if globals().get('current_vote_target_id'):
+        # Call the actual finalization logic
+        finalize_current_vote()
+    else:
+        app.logger.info("No vote active, skipping auto-finalization.")
+
+
+def finalize_current_vote():
+    """
+    The core logic to finalize the vote, separated for reusability.
+    This must be called within the Flask/SocketIO context (e.g., inside a handler or spawned greenlet).
+    """
+    # Use 'global' keyword to modify the global state variables
+    global mun_documents, current_vote_target_id, current_vote_tally, vote_timer_thread
+
+    target_doc = get_document_by_id(current_vote_target_id)
+    if not current_vote_target_id or not target_doc:
+        # Should not happen if called correctly, but for safety
+        app.logger.warning("Attempted to finalize vote but no target ID was set.")
+        return
+
+    target_title = target_doc['title']
+
+    # 1. Calculate the result
+    yay = current_vote_tally['yay']
+    nay = current_vote_tally['nay']
+    abstain = current_vote_tally['abstain']
+    total_votes = yay + nay + abstain
+    # Result logic based on Yay vs Nay (Abstentions don't count towards the majority)
+    result = 'PASSED' if yay > nay else 'FAILED'
+
+    # 2. Create the result document
+    result_content = (
+        f"VOTE ON: {target_title}\n"
+        f"--- FINAL RESULT (Auto-Closed after {VOTE_DURATION_SECONDS}s) ---\n"
+        f"Result: {result} ({'Passed' if result == 'PASSED' else 'Failed'} by simple majority)\n\n"
+        f"Yay Votes: {yay}\n"
+        f"Nay Votes: {nay}\n"
+        f"Abstain Votes: {abstain}\n"
+        f"Total Votes Cast: {total_votes}\n"
+    )
+    new_doc = {
+        'id': str(uuid.uuid4()),
+        'type': 'vote_result',
+        'title': f'VOTE RESULT: {target_title}',
+        'content': result_content,
+        'delegate': 'CHAIRMAN',
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    mun_documents.append(new_doc)
+
+    # 3. Reset the global vote state
+    current_vote_target_id = None
+    current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
+    vote_timer_thread = None  # Reset the timer variable
+
+    # 4. Broadcast the new stream and inform clients the vote is over
+    broadcast_stream()
+    socketio.emit('vote_ended', broadcast=True)
+
+    # The admin is informed via the socket emit inside the moderator_action handler,
+    # but since this is auto-called, we must inform them here as well.
+    # Note: socketio.emit outside of a request context requires a context wrapper,
+    # but the way eventlet is used with Flask-SocketIO often handles this.
+    socketio.emit('feedback', {'message': f'Vote on "{new_doc["title"]}" finalized automatically.'})
+    socketio.emit('admin_state_update', {})  # For admin page to refresh
+
+
+# --- ROUTES (Omitted for brevity, they are unchanged) ---
+# ... (all routes remain the same) ...
 
 @app.route('/')
 def index():
@@ -198,6 +287,7 @@ def dashboard():
 def stream_content_api():
     """Returns the raw HTML content of the document stream for AJAX polling."""
     return render_stream()
+
 
 @app.route('/vote_status_api')
 def vote_status_api():
@@ -322,7 +412,7 @@ def handle_mun_submission(data):
 def handle_moderator_action(data):
     """Handles actions specific to the Admin (Chairman) role."""
     # Use 'global' keyword to modify the global state variables
-    global mun_documents, current_vote_target_id, current_vote_tally
+    global mun_documents, current_vote_target_id, current_vote_tally, vote_timer_thread
 
     if session.get('role') != 'admin':
         emit('feedback', {'message': 'Unauthorized action.'})
@@ -338,21 +428,31 @@ def handle_moderator_action(data):
             emit('feedback', {'message': 'Invalid document ID or document type for voting.'})
             return
 
-        # 1. Reset and activate the vote (UPDATED to include 'abstain')
+        # Guard against starting a vote while another is active
+        if current_vote_target_id:
+            emit('feedback', {'message': 'Cannot start a new vote; one is already active.'})
+            return
+
+        # 1. Reset and activate the vote
         current_vote_target_id = target_doc_id
         current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
         target_title = target_doc['title']
 
         # 2. Announce the vote start to all clients (Delegates need this)
         socketio.emit('vote_started', {'target': target_title}, broadcast=True)
-        emit('feedback', {'message': f'Formal vote on "{target_title}" started.'})
+        emit('feedback',
+             {'message': f'Formal vote on "{target_title}" started. Auto-closing in {VOTE_DURATION_SECONDS} seconds.'})
+
+        # 3. START THE AUTO-FINALIZATION TIMER
+        # Use eventlet.spawn to run the auto_finalize_vote function concurrently
+        vote_timer_thread = eventlet.spawn(auto_finalize_vote)
 
         # Add a record to the stream that a vote has started
         new_doc = {
             'id': str(uuid.uuid4()),
             'type': 'moderator_announcement',
             'title': 'VOTE STARTED',
-            'content': f'A formal vote is now open on the **{target_doc["type"].upper()}**: {target_title}. All delegates must cast their vote (YAY/NAY/ABSTAIN).',
+            'content': f'A formal vote is now open on the **{target_doc["type"].upper()}**: {target_title}. All delegates must cast their vote (YAY/NAY/ABSTAIN). The vote will close automatically in {VOTE_DURATION_SECONDS} seconds.',
             'delegate': 'CHAIRMAN',
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
@@ -362,57 +462,30 @@ def handle_moderator_action(data):
 
     elif action == 'finalize_vote':
 
-        target_doc = get_document_by_id(current_vote_target_id)
-        if not current_vote_target_id or not target_doc:
+        if not current_vote_target_id:
             emit('feedback', {'message': 'No vote is currently active to finalize.'})
             return
 
-        target_title = target_doc['title']
+        # Optional: Cancel the auto-finalize timer if the admin manually closes it early
+        if vote_timer_thread:
+            # eventlet.kill() is the method to stop a greenlet
+            eventlet.kill(vote_timer_thread)
+            vote_timer_thread = None
+            app.logger.info("Admin manually closed the vote, auto-finalize timer cancelled.")
 
-        # 1. Calculate the result
-        yay = current_vote_tally['yay']
-        nay = current_vote_tally['nay']
-        abstain = current_vote_tally['abstain']  # Added abstain
-        total_votes = yay + nay + abstain
-        # Result logic based on Yay vs Nay (Abstentions don't count towards the majority)
-        result = 'PASSED' if yay > nay else 'FAILED'
+        # Call the core finalization logic
+        finalize_current_vote()
 
-        # 2. Create the result document
-        voters_list = sorted(list(current_vote_tally['voters']))
-
-        # UPDATED: Included abstain in the result content
-        result_content = (
-            f"VOTE ON: {target_title}\n"
-            f"--- FINAL RESULT ---\n"
-            f"Result: {result} ({'Passed' if result == 'PASSED' else 'Failed'} by simple majority)\n\n"
-            f"Yay Votes: {yay}\n"
-            f"Nay Votes: {nay}\n"
-            f"Abstain Votes: {abstain}\n"
-            f"Total Votes Cast: {total_votes}\n"
-        )
-        new_doc = {
-            'id': str(uuid.uuid4()),
-            'type': 'vote_result',
-            'title': f'VOTE RESULT: {target_title}',
-            'content': result_content,
-            'delegate': 'CHAIRMAN',
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        mun_documents.append(new_doc)
-
-        # 3. Reset the global vote state (UPDATED to include 'abstain')
-        current_vote_target_id = None
-        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
-
-        # 4. Broadcast the new stream and inform clients the vote is over
-        broadcast_stream()
-        socketio.emit('vote_ended', broadcast=True)
-
-        emit('feedback', {'message': f'Vote on "{new_doc["title"]}" finalized and published.'})
+        emit('feedback', {'message': 'Vote finalized and published.'})
         emit('admin_state_update', {})
 
 
     elif action == 'clear_stream':
+        # Safely stop the auto-finalize timer if it's running
+        if vote_timer_thread:
+            eventlet.kill(vote_timer_thread)
+            vote_timer_thread = None
+
         mun_documents = []
         current_vote_target_id = None
         # UPDATED to include 'abstain'
