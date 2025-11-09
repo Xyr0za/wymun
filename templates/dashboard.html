@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MUN Live Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
@@ -22,8 +21,8 @@
 
     <main class="flex flex-grow p-6">
         <section class="w-full bg-white p-6 rounded-xl shadow-lg">
-            <h2 class="text-2xl font-bold text-gray-700 mb-4 border-b pb-2">Real-Time Document Stream</h2>
-            <p class="text-sm text-gray-500 mb-4">This feed updates instantly when delegates or the Chairman submit new documents or actions.</p>
+            <h2 class="text-2xl font-bold text-gray-700 mb-4 border-b pb-2">Regularly Updated Document Stream</h2>
+            <p class="text-sm text-gray-500 mb-4">This feed updates automatically every 5 seconds.</p>
             <div id="document-stream" class="h-[80vh] overflow-y-auto pr-2">
                 {{ stream_content | safe }}
             </div>
@@ -31,25 +30,28 @@
     </main>
 
     <script>
-        // FIX: Establish SocketIO connection
-        const socket = io({
-            // Prioritize WebSocket transport
-            transports: ['websocket', 'polling'],
-            // Ensure the connection finds the correct endpoint path
-            path: '/socket.io/'
-        });
         const documentStream = document.getElementById('document-stream');
 
-        socket.on('connect', function() {
-            console.log('Connected to MUN Live Dashboard server.');
-        });
+        function fetchStreamUpdate() {
+            // FIX 2: Use Fetch API to get the new stream content from the dedicated endpoint
+            fetch('{{ url_for("stream_content_api") }}')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    documentStream.innerHTML = html;
+                    documentStream.scrollTop = 0; // Keep newest items visible
+                    console.log('Stream updated via AJAX polling.');
+                })
+                .catch(error => console.error('Error fetching stream:', error));
+        }
 
-        // FIX: Listener for the server broadcast to update the stream element
-        socket.on('stream_update', function(msg) {
-            documentStream.innerHTML = msg.data;
-            documentStream.scrollTop = 0; // Scroll to the top for the newest item
-            console.log('Document stream updated live.');
-        });
+        // FIX 3: Start polling immediately and then every 5 seconds (5000 milliseconds)
+        fetchStreamUpdate();
+        setInterval(fetchStreamUpdate, 5000);
     </script>
 </body>
 </html>

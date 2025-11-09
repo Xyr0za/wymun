@@ -1,6 +1,3 @@
-import eventlet  # Required for asynchronous server
-eventlet.monkey_patch()
-
 from flask import Flask, render_template, request, redirect, url_for, session, flash, get_flashed_messages
 from flask_socketio import SocketIO, emit
 from datetime import datetime
@@ -8,16 +5,15 @@ import json
 import logging
 import uuid
 import time
-
+import eventlet  # Still required for the delegate/admin pages' SocketIO functions
 
 # Set up basic logging (optional but helpful)
 logging.basicConfig(level=logging.INFO)
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
-# IMPORTANT: Never use a hardcoded key in production. Load from environment.
 app.config['SECRET_KEY'] = 'A_VERY_SECRET_KEY_FOR_MUN_APP'
-# FIX: Configure SocketIO explicitly for eventlet async mode for stability
+# Configure SocketIO explicitly for eventlet async mode for stability
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Hardcoded roles for simulation
@@ -96,7 +92,7 @@ def get_votable_documents():
 def broadcast_stream():
     """
     Emits the updated stream to all connected clients.
-    The use of broadcast=True ensures all clients receive the update.
+    (This is kept for the delegate/admin pages, even if the dashboard uses polling)
     """
     stream_html = render_stream()
     socketio.emit('stream_update', {'data': stream_html}, broadcast=True)
@@ -183,6 +179,13 @@ def dashboard():
     return render_template('dashboard.html', stream_content=render_stream())
 
 
+# FIX 1: New route to serve just the stream HTML for AJAX polling
+@app.route('/stream_content_api')
+def stream_content_api():
+    """Returns the raw HTML content of the document stream for AJAX polling."""
+    return render_stream()
+
+
 # --- SOCKETIO EVENT HANDLERS ---
 
 @socketio.on('connect')
@@ -192,7 +195,7 @@ def handle_connect():
     app.logger.info(f'{user} connected.')
 
     # Send the initial stream content immediately upon connection
-    emit('stream_update', {'data': render_stream()})
+    # emit('stream_update', {'data': render_stream()}) # No longer needed for dashboard
 
     # Send current vote status on connect
     global current_vote_target_id
@@ -389,5 +392,5 @@ if __name__ == '__main__':
 
     # FIX: Run the application using eventlet WSGI server for robust SocketIO performance
     app.logger.info("Starting MUN app with eventlet server...")
-    # Listen on all external interfaces ('0.0.0.0') for testing across devices
+    # This is how Gunicorn will run the app (ensure you run this if not using Gunicorn)
     eventlet.wsgi.server(eventlet.listen(('', 5000)), app, debug=True)
