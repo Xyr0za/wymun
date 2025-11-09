@@ -305,7 +305,6 @@ def handle_moderator_action(data):
 
 
     elif action == 'finalize_vote':
-        global current_vote_target_id, current_vote_tally
 
         target_doc = get_document_by_id(current_vote_target_id)
         if not current_vote_target_id or not target_doc:
