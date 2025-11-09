@@ -4,14 +4,17 @@ from datetime import datetime
 import json
 import logging
 import uuid  # Import for generating unique IDs
+import time # For robust exponential backoff handling if using external APIs, though not needed here
 
 # Set up basic logging (optional but helpful)
 logging.basicConfig(level=logging.INFO)
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
+# IMPORTANT: Never use a hardcoded key in production. Load from environment.
 app.config['SECRET_KEY'] = 'A_VERY_SECRET_KEY_FOR_MUN_APP'
-socketio = SocketIO(app)
+# Configure SocketIO for robust cross-origin handling
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Hardcoded roles for simulation
 ADMIN_USER = 'ADMIN'
@@ -21,7 +24,8 @@ VALID_DELEGATES = ['UK', 'FRANCE', 'USA', 'CHINA', 'RUSSIA', 'GERMANY', 'INDIA']
 # A list to store the chronological event stream
 mun_documents = []
 
-# Vote Tracking State (New)
+# Vote Tracking State
+# We track voters by their delegate ID to ensure a delegate votes only once.
 current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
 current_vote_target_id = None  # Tracks the ID of the document being voted on
 
@@ -42,12 +46,13 @@ def render_stream():
     """Renders the current state of the document stream into HTML."""
     # Using Tailwind-like classes for aesthetics
     html_content = '<div class="space-y-4 font-sans max-w-2xl mx-auto">'
+    # Iterate in reverse to show newest items first
     for doc in reversed(mun_documents):
         # Determine color/style based on type
         bg_class = 'bg-gray-50 border-gray-300'
         title_tag = 'h3'
         border_color = 'border-l-4'
-        vote_status = ''  # New variable for vote status indicator
+        vote_status = ''
 
         if doc['type'] == 'resolution':
             bg_class = 'bg-blue-50 border-blue-500'
@@ -58,11 +63,10 @@ def render_stream():
         elif doc['type'] == 'moderator_announcement':
             bg_class = 'bg-red-50 border-red-500'
 
-        # Add a visual indicator if this document is the current vote target
-        if current_vote_target_id == doc.get('id'):
+        # Check if this document is the current vote target
+        if globals().get('current_vote_target_id') == doc.get('id'):
             vote_status = '<span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full ml-2">VOTING ACTIVE</span>'
 
-        # Include the ID in the rendered content (hidden, but helpful for debugging/admin actions)
         doc_id_display = f'<span class="text-xs text-gray-400 ml-2">ID: {doc.get("id", "N/A")}</span>'
 
         html_content += f"""
@@ -90,7 +94,10 @@ def get_votable_documents():
 
 
 def broadcast_stream():
-    """Emits the updated stream to all connected clients."""
+    """
+    Emits the updated stream to all connected clients.
+    The use of broadcast=True ensures all clients receive the update.
+    """
     stream_html = render_stream()
     socketio.emit('stream_update', {'data': stream_html}, broadcast=True)
 
@@ -126,11 +133,9 @@ def login():
 
         else:
             flash('Invalid Delegate ID or Admin code.', 'error')
-            # Fetch flashed messages for rendering
             messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
             return render_template('login.html', messages=messages)
 
-    # Fetch flashed messages for GET request (e.g., redirected from index)
     messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
     return render_template('login.html', messages=messages)
 
@@ -161,7 +166,6 @@ def admin_page():
 
     messages = [(msg, category) for msg, category in get_flashed_messages(with_categories=True)]
 
-    # Pass the list of votable documents to the admin template
     votable_docs = get_votable_documents()
     current_target = get_document_by_id(current_vote_target_id)
 
@@ -175,6 +179,7 @@ def admin_page():
 
 @app.route('/dashboard')
 def dashboard():
+    # The stream_content variable is rendered initially by Flask on page load
     return render_template('dashboard.html', stream_content=render_stream())
 
 
@@ -200,9 +205,8 @@ def handle_connect():
 @socketio.on('mun_submission')
 def handle_mun_submission(data):
 
+    # Use 'global' keyword to modify the global state variables
     global current_vote_target_id, current_vote_tally
-
-    """Handles submissions of resolutions, amendments, and votes."""
 
     submission_type = data.get('type')
     delegate_id = session.get('user')
@@ -214,7 +218,6 @@ def handle_mun_submission(data):
     # --- Vote Submission Handler ---
     if submission_type == 'vote':
         vote = data.get('vote')
-
         target_doc = get_document_by_id(current_vote_target_id)
 
         if not current_vote_target_id or not target_doc:
@@ -239,14 +242,14 @@ def handle_mun_submission(data):
                 'voter_count': len(current_vote_tally['voters']),
                 'total_delegates': len(VALID_DELEGATES)
             }, broadcast=True)
-            return  # Stop here to prevent individual votes from showing in the main stream
+            return
 
         return
 
     # --- Resolution/Amendment Submission Handler ---
     elif submission_type in ['resolution', 'amendment']:
         new_doc = {
-            'id': str(uuid.uuid4()),  # Assign a unique ID
+            'id': str(uuid.uuid4()),
             'type': submission_type,
             'title': data.get('title'),
             'content': data.get('content'),
@@ -257,7 +260,7 @@ def handle_mun_submission(data):
 
         emit('feedback', {'message': f'{submission_type.title()} "{new_doc["title"]}" submitted.'}, broadcast=False)
 
-        # Broadcast the updated stream to all clients
+        # FIX: Ensure this critical broadcast call updates all clients (including the dashboard)
         broadcast_stream()
         return
 
@@ -267,6 +270,7 @@ def handle_mun_submission(data):
 @socketio.on('moderator_action')
 def handle_moderator_action(data):
     """Handles actions specific to the Admin (Chairman) role."""
+    # Use 'global' keyword to modify the global state variables
     global mun_documents, current_vote_target_id, current_vote_tally
 
     if session.get('role') != 'admin':
@@ -290,7 +294,6 @@ def handle_moderator_action(data):
 
         # 2. Announce the vote start to all clients (Delegates need this)
         socketio.emit('vote_started', {'target': target_title}, broadcast=True)
-        # 3. Inform Admin directly
         emit('feedback', {'message': f'Formal vote on "{target_title}" started.'})
 
         # Add a record to the stream that a vote has started
@@ -319,8 +322,6 @@ def handle_moderator_action(data):
         yay = current_vote_tally['yay']
         nay = current_vote_tally['nay']
         total_votes = yay + nay
-
-        # Simple majority rule check (yay > nay)
         result = 'PASSED' if yay > nay else 'FAILED'
 
         # 2. Create the result document
@@ -352,17 +353,14 @@ def handle_moderator_action(data):
 
         # 4. Broadcast the new stream and inform clients the vote is over
         broadcast_stream()
-        socketio.emit('vote_ended', broadcast=True)  # Tells delegates to hide buttons
+        socketio.emit('vote_ended', broadcast=True)
 
         emit('feedback', {'message': f'Vote on "{new_doc["title"]}" finalized and published.'})
-
-        # Send an update to the admin page to refresh the votable list and clear tally display
         emit('admin_state_update', {})
 
 
     elif action == 'clear_stream':
         mun_documents = []
-        # Also clear vote state just in case
         current_vote_target_id = None
         current_vote_tally = {'yay': 0, 'nay': 0, 'voters': set()}
         socketio.emit('vote_ended', broadcast=True)
@@ -373,7 +371,6 @@ def handle_moderator_action(data):
 
 
     elif action == 'announce':
-        # Handles general announcements from the Chair
         announcement_content = data.get('content', 'Chairman made an announcement.')
         new_doc = {
             'id': str(uuid.uuid4()),
@@ -391,4 +388,5 @@ def handle_moderator_action(data):
 if __name__ == '__main__':
     # Use a high-level logging configuration
     app.logger.setLevel('INFO')
+    # Run the application using socketio.run, which is required for websocket support
     socketio.run(app, debug=True)
