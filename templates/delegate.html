@@ -67,14 +67,6 @@
                 <h2 class="text-xl font-bold text-mun-primary mb-3">FORMAL VOTE ACTIVE</h2>
                 <p class="text-lg mb-4 text-mun-secondary-text" id="vote-prompt">Casting vote on:</p>
 
-                <div id="vote-tally-display" class="bg-[#374151] p-3 rounded-lg mb-4 text-sm font-semibold text-mun-light-text hidden">
-                    <p class="mb-1">Live Tally (Votes Cast: <span id="voter-count">0</span> / <span id="total-delegates">0</span>)</p>
-                    <div class="flex justify-between">
-                        <span class="text-green-400">YAY: <span id="tally-yay">0</span></span>
-                        <span class="text-red-400">NAY: <span id="tally-nay">0</span></span>
-                        <span class="text-gray-400">ABSTAIN: <span id="tally-abstain">0</span></span>
-                    </div>
-                </div>
                 <div class="flex space-x-3">
                     <button onclick="submitVote('yay')" id="yay-btn"
                         class="flex-1 bg-green-600 hover:bg-green-500 text-white font-extrabold py-3 rounded-xl transition duration-150 shadow-lg transform active:scale-95 disabled:bg-gray-500 disabled:text-gray-300">

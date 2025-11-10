@@ -120,10 +120,6 @@
 
                 <div id="vote-finalization-controls" class="mt-6 space-y-4 hidden">
                     <h3 class="text-lg font-bold text-indigo-400">Finalize Vote</h3>
-                    <div id="vote-tally" class="p-4 bg-[#2a3749] rounded-lg">
-                        <p class="font-bold text-md text-mun-light-text mb-2">Live Vote Status:</p>
-                        <p class="text-mun-secondary-text">Votes Cast: <span id="voter-count" class="font-bold text-indigo-400">0</span> / <span id="total-delegates-count">{{ VALID_DELEGATES|length }}</span></p>
-                    </div>
                     <button onclick="finalizeVote()" id="finalize-vote-btn"
                         class="w-full bg-mun-primary hover:bg-[#A82323] text-white font-semibold py-3 rounded-lg transition duration-150 transform active:scale-95">
                         FINALIZE VOTE & PUBLISH RESULT
