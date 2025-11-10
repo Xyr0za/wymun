@@ -1,5 +1,5 @@
 # --- IMPORTS & ASYNC CONFIGURATION ---
-import eventlet # Required for SocketIO with eventlet async mode
+import eventlet  # Required for SocketIO with eventlet async mode
 from flask import (
     Flask, render_template, request, redirect, url_for,
     session, flash, get_flashed_messages
@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 import logging
 import uuid
-import time # Not strictly used, but kept from original
+import time  # Not strictly used, but kept from original
 
 import json
 
@@ -28,20 +28,24 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 ADMIN_USER = 'ADMIN'
 # Updated list of valid delegate names
 
-with open("delegates.json") as file:
-    dele = json.load(file)
-    VALID_DELEGATES = list( dele["Delegates"].keys() )
-    VALID_DELEGATES = [x.upper() for x in VALID_DELEGATES]
-    # VALID_DELEGATES = ['France', 'Israel', 'Australia']
+# NOTE: Assumes delegates.json exists and is structured correctly
+try:
+    with open("delegates.json") as file:
+        dele = json.load(file)
+        VALID_DELEGATES = [x.upper() for x in list(dele["Delegates"].keys())]
+except FileNotFoundError:
+    logging.warning("delegates.json not found. Using default delegate list for testing.")
+    VALID_DELEGATES = ['FRANCE', 'ISRAEL', 'AUSTRALIA', 'INDIA', 'CHINA']
 
 # --- GLOBAL STATE (In-memory Database Stand-in) ---
 # Stores all submitted resolutions, amendments, announcements, and results
 mun_documents = []
 
 # Tracks the current vote status (global state)
-# 'abstain' added to the tally
-current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
-current_vote_target_id = None # ID of the document currently being voted on
+# CHANGED: 'voters' is now a dictionary to store {delegate_id: vote_choice}
+current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
+current_vote_target_id = None  # ID of the document currently being voted on
+
 
 # --- UTILITY FUNCTIONS ---
 
@@ -212,6 +216,7 @@ def stream_content_api():
     """Returns the raw HTML content of the document stream for AJAX polling."""
     return render_stream()
 
+
 @app.route('/vote_status_api')
 def vote_status_api():
     """Returns the current voting status and tally as JSON."""
@@ -230,6 +235,7 @@ def vote_status_api():
     delegate_id = get_current_user_id()
 
     # Determine if the current delegate has voted
+    # CHANGED: Check in the 'voters' dictionary
     has_voted = delegate_id in current_vote_tally['voters']
 
     return json.dumps({
@@ -286,6 +292,7 @@ def handle_mun_submission(data):
             emit('feedback', {'message': 'No formal vote is currently active.'})
             return
 
+        # CHANGED: Check if the delegate has already voted (in dict keys)
         if delegate_id in current_vote_tally['voters']:
             emit('feedback', {'message': 'You have already cast your vote.'})
             return
@@ -293,7 +300,8 @@ def handle_mun_submission(data):
         # Process the vote (yay, nay, or abstain)
         if vote in ['yay', 'nay', 'abstain']:
             current_vote_tally[vote] += 1
-            current_vote_tally['voters'].add(delegate_id)
+            # CHANGED: Store the delegate's vote choice in the dictionary
+            current_vote_tally['voters'][delegate_id] = vote
             emit('feedback', {'message': f'Vote recorded: {vote.upper()} on {target_doc["title"]}'})
 
             # Broadcast the live tally update to the admin page
@@ -319,7 +327,7 @@ def handle_mun_submission(data):
         mun_documents.append(new_doc)
 
         emit('feedback', {'message': f'{submission_type.title()} "{new_doc["title"]}" submitted.'}, broadcast=False)
-        broadcast_stream() # Update Admin/Dashboard stream
+        broadcast_stream()  # Update Admin/Dashboard stream
         return
 
     emit('feedback', {'message': 'Invalid submission type.'})
@@ -347,7 +355,8 @@ def handle_moderator_action(data):
 
         # Reset and activate the vote state
         current_vote_target_id = target_doc_id
-        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
+        # CHANGED: Reset 'voters' to an empty dictionary
+        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
         target_title = target_doc['title']
 
         # Announce the vote start to all clients
@@ -386,6 +395,22 @@ def handle_moderator_action(data):
         # Result logic: Simple majority of Yay vs Nay votes
         result = 'PASSED' if yay > nay else 'FAILED'
 
+        # ADDED: Generate the list of individual delegate votes
+        # Sort by delegate name for consistent display
+        vote_list_items = [
+            f"- {delegate}: {vote.upper()}"
+            for delegate, vote in sorted(current_vote_tally['voters'].items())
+        ]
+        # Include delegates who DID NOT vote (if any)
+        voted_delegates = set(current_vote_tally['voters'].keys())
+        not_voted_delegates = sorted([d for d in VALID_DELEGATES if d not in voted_delegates])
+
+        if not_voted_delegates:
+            vote_list_items.append("\n--- DELEGATES WHO DID NOT VOTE ---\n")
+            vote_list_items.extend([f"- {delegate}: NOT CAST" for delegate in not_voted_delegates])
+
+        vote_list_content = "\n".join(vote_list_items)
+
         # Create the result document
         result_content = (
             f"VOTE ON: {target_title}\n"
@@ -394,7 +419,9 @@ def handle_moderator_action(data):
             f"Yay Votes: {yay}\n"
             f"Nay Votes: {nay}\n"
             f"Abstain Votes: {abstain}\n"
-            f"Total Votes Cast: {total_votes}\n"
+            f"Total Votes Cast: {total_votes} out of {len(VALID_DELEGATES)} possible votes\n\n"
+            f"--- INDIVIDUAL DELEGATE VOTES ---\n"
+            f"{vote_list_content}\n"  # Insert the detailed vote list here
         )
         new_doc = {
             'id': str(uuid.uuid4()),
@@ -408,20 +435,22 @@ def handle_moderator_action(data):
 
         # Reset the global vote state
         current_vote_target_id = None
-        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
+        # CHANGED: Reset 'voters' to an empty dictionary
+        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
 
         # Broadcast the new stream and inform clients the vote is over
         broadcast_stream()
         socketio.emit('vote_ended', broadcast=True)
 
         emit('feedback', {'message': f'Vote on "{new_doc["title"]}" finalized and published.'})
-        emit('admin_state_update', {}) # Trigger an admin page refresh
+        emit('admin_state_update', {})  # Trigger an admin page refresh
 
     # --- Clear Stream Action ---
     elif action == 'clear_stream':
         mun_documents = []
         current_vote_target_id = None
-        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': set()}
+        # CHANGED: Reset 'voters' to an empty dictionary
+        current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
 
         # End any active vote and update the stream
         socketio.emit('vote_ended', broadcast=True)
