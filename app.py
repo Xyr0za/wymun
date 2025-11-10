@@ -17,8 +17,7 @@ logging.basicConfig(level=logging.INFO)
 
 # --- APPLICATION & SOCKETIO SETUP ---
 app = Flask(__name__)
-# WARNING: Replace this with a secure, long, random key in production
-app.config['SECRET_KEY'] = 'A_VERY_SECRET_KEY_FOR_MUN_APP'
+app.config['SECRET_KEY'] = 'funkeywow'
 
 # Configure SocketIO explicitly for eventlet async mode and allow all origins for testing
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
