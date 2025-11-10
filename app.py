@@ -16,17 +16,16 @@ logging.basicConfig(level=logging.INFO)
 
 # --- APPLICATION & SOCKETIO SETUP ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'funkeywow'
+# WARNING: Replace this with a secure, long, random key in production
+app.config['SECRET_KEY'] = 'A_VERY_SECRET_KEY_FOR_MUN_APP'
 
 # Configure SocketIO explicitly for eventlet async mode and allow all origins for testing
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- GLOBAL CONFIGURATION ---
-ADMIN_USER = 'RUSSIAA'
-
+ADMIN_USER = 'ADMIN'
 # Updated list of valid delegate names
-
-VALID_DELEGATES = ["UK", "FRANCE", "RUSSIA", "GERMANY"]
+VALID_DELEGATES = ['UK', 'FRANCE', 'USA', 'CHINA', 'RUSSIA', 'GERMANY', 'INDIA']
 
 # --- GLOBAL STATE (In-memory Database Stand-in) ---
 # Stores all submitted resolutions, amendments, announcements, and results
