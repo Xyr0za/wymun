@@ -134,15 +134,15 @@ def broadcast_stream():
 
 # --- FLASK ROUTES: AUTHENTICATION & NAVIGATION ---
 
-# @app.route('/')
-# def index():
-#     """Root route: Redirects based on session status."""
-#     if 'user' in session;l:
-#         return redirect(url_for('admin_page') if session.get('role') == 'admin' else url_for('delegate_page'))
-#     return redirect(url_for('login'))
-
-
 @app.route('/')
+def index():
+    """Root route: Redirects based on session status."""
+    if 'user' in session;l:
+        return redirect(url_for('admin_page') if session.get('role') == 'admin' else url_for('delegate_page'))
+    return redirect(url_for('login'))
+
+
+@app.route('/roster')
 def delegate_roster():
     """Loads delegate data from JSON and renders the HTML template."""
     return render_template(
