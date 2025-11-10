@@ -137,16 +137,16 @@ def broadcast_stream():
 @app.route('/')
 def index():
     """Root route: Redirects based on session status."""
-    if 'user' in session;l:
+    if 'user' in session:
         return redirect(url_for('admin_page') if session.get('role') == 'admin' else url_for('delegate_page'))
     return redirect(url_for('login'))
 
 
 @app.route('/roster')
-def delegate_roster():
-    """Loads delegate data from JSON and renders the HTML template."""
+def roster():
     return render_template(
-        'delegate_roster.html')
+        'delegate_roster.html'
+    )
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
