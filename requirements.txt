@@ -2,4 +2,4 @@ Flask
 Flask-SocketIO
 python-dotenv  # For managing the SECRET_KEY environment variable
 eventlet       # For asynchronous workers to handle WebSockets
-gunicorn
+gunicornt
