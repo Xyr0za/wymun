@@ -148,6 +148,7 @@ def roster():
         'delegate_roster.html'
     )
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Handles user login for Admin or Delegates."""
@@ -369,7 +370,17 @@ def handle_moderator_action(data):
         socketio.emit('vote_started', {'target': target_title}, broadcast=True)
         emit('feedback', {'message': f'Formal vote on "{target_title}" started.'})
 
-        # Add an announcement to the stream
+        # --- NEW LOGIC: MOVE TARGET DOCUMENT TO THE END OF THE LIST (TOP OF STREAM) ---
+        # 1. Temporarily remove the document from its current position
+        # Use slicing assignment to modify the list in place
+        mun_documents[:] = [doc for doc in mun_documents if doc.get('id') != target_doc_id]
+
+        # 2. Add it back to the end of the list, updating the timestamp
+        target_doc['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        mun_documents.append(target_doc)
+        # -------------------------------------------------------------------
+
+        # Add an announcement to the stream *after* the document has been moved
         new_doc = {
             'id': str(uuid.uuid4()),
             'type': 'moderator_announcement',
