@@ -84,14 +84,14 @@
             </div>
 
             <form id="submission-form" class="bg-mun-card p-6 rounded-xl shadow-xl border-t-4 border-mun-primary">
-                <h2 class="text-xl font-bold text-mun-primary mb-4">Submit Document</h2>
+                <h2 class="text-xl font-bold bg-indigo-600 hover:bg-indigo-500 text-mun-primary mb-4">Submit Document</h2>
 
                 <div class="mb-4">
                     <label for="doc_type" class="block text-sm font-medium text-mun-light-text mb-2">Document Type</label>
                     <select id="doc_type" name="doc_type"
                         class="w-full p-2 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-lg focus:border-mun-primary focus:ring-mun-primary">
-                        <option value="resolution">Resolution</option>
                         <option value="amendment">Amendment</option>
+                        <option value="resolution">Resolution</option>
                     </select>
                 </div>
 
@@ -244,9 +244,6 @@
                 // The buttons will be disabled automatically when pollVoteStatus runs again
                 // based on the server's response, but we can preemptively disable them
                 // for immediate visual feedback.
-                yayBtn.disabled = true;
-                nayBtn.disabled = true;
-                abstainBtn.disabled = true;
             }
         }
 

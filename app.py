@@ -134,13 +134,35 @@ def broadcast_stream():
 
 # --- FLASK ROUTES: AUTHENTICATION & NAVIGATION ---
 
-@app.route('/')
-def index():
-    """Root route: Redirects based on session status."""
-    if 'user' in session:
-        return redirect(url_for('admin_page') if session.get('role') == 'admin' else url_for('delegate_page'))
-    return redirect(url_for('login'))
+# @app.route('/')
+# def index():
+#     """Root route: Redirects based on session status."""
+#     if 'user' in session:
+#         return redirect(url_for('admin_page') if session.get('role') == 'admin' else url_for('delegate_page'))
+#     return redirect(url_for('login'))
 
+
+@app.route('/')
+def delegate_roster():
+    """Loads delegate data from JSON and renders the HTML template."""
+
+    # 1. Load data from delegates.json
+    try:
+        with open('delegates.json', 'r') as f:
+            delegates = json.load(f)
+    except FileNotFoundError:
+        # Handle case where the data file is missing
+        delegates = []
+
+    # 2. Calculate the number of delegates for the header
+    num_delegates = len(delegates)
+
+    # 3. Render the template, passing the data
+    return render_template(
+        'delegate_roster.html',
+        delegates=delegates,
+        num_delegates=num_delegates
+    )
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
