@@ -11,6 +11,8 @@ import logging
 import uuid
 import time # Not strictly used, but kept from original
 
+import json
+
 # Set up basic logging for visibility
 logging.basicConfig(level=logging.INFO)
 
@@ -25,7 +27,11 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # --- GLOBAL CONFIGURATION ---
 ADMIN_USER = 'ADMIN'
 # Updated list of valid delegate names
-VALID_DELEGATES = ['UK', 'FRANCE', 'USA', 'CHINA', 'RUSSIA', 'GERMANY', 'INDIA']
+
+with open("delegates.json") as file:
+    dele = json.load(file)
+    VALID_DELEGATES = list( dele["Delegates"].keys() )
+    # VALID_DELEGATES = ['France', 'Israel', 'Australia']⌈
 
 # --- GLOBAL STATE (In-memory Database Stand-in) ---
 # Stores all submitted resolutions, amendments, announcements, and results
