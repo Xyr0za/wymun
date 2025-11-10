@@ -31,7 +31,8 @@ ADMIN_USER = 'ADMIN'
 with open("delegates.json") as file:
     dele = json.load(file)
     VALID_DELEGATES = list( dele["Delegates"].keys() )
-    # VALID_DELEGATES = ['France', 'Israel', 'Australia']⌈
+    VALID_DELEGATES = [x.upper() for x in VALID_DELEGATES]
+    # VALID_DELEGATES = ['France', 'Israel', 'Australia']
 
 # --- GLOBAL STATE (In-memory Database Stand-in) ---
 # Stores all submitted resolutions, amendments, announcements, and results
