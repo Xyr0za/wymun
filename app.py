@@ -419,13 +419,6 @@ def handle_moderator_action(data):
             f"- {delegate}: {vote.upper()}"
             for delegate, vote in sorted(current_vote_tally['voters'].items())
         ]
-        # Include delegates who DID NOT vote (if any)
-        voted_delegates = set(current_vote_tally['voters'].keys())
-        not_voted_delegates = sorted([d for d in VALID_DELEGATES if d not in voted_delegates])
-
-        if not_voted_delegates:
-            vote_list_items.append("\n--- DELEGATES WHO DID NOT VOTE ---\n")
-            vote_list_items.extend([f"- {delegate}: NOT CAST" for delegate in not_voted_delegates])
 
         vote_list_content = "\n".join(vote_list_items)
 
