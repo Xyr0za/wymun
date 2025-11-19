@@ -19,14 +19,15 @@ logging.basicConfig(level=logging.INFO)
 # --- APPLICATION & SOCKETIO SETUP ---
 app = Flask(__name__)
 # WARNING: Replace this with a secure, long, random key in production
-app.config['SECRET_KEY'] = 'A_VERY_SECRET_KEY_FOR_MUN_APP'
+app.config['SECRET_KEY'] = 'secret_key'
 
 # Configure SocketIO explicitly for eventlet async mode and allow all origins for testing
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- GLOBAL CONFIGURATION ---
 ADMIN_USER = 'ADMIN'
-# Updated list of valid delegate names
+# TODO : Change admin login to environ var
+#  if valid delegate names
 
 # NOTE: Assumes delegates.json exists and is structured correctly
 try:
