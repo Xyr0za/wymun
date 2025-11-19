@@ -25,7 +25,7 @@ app.config['SECRET_KEY'] = 'secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- GLOBAL CONFIGURATION ---
-ADMIN_USER = 'ADMIN'
+ADMIN_USER = 'russya'
 # TODO : Change admin login to environ var
 #  if valid delegate names
 
