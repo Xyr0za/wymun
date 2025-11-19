@@ -28,51 +28,102 @@
 </head>
 <body class="bg-mun-dark-bg min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-mun-card p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-sm md:max-w-md border-t-4 border-mun-primary">
+    <div class="w-full max-w-5xl grid md:grid-cols-2 gap-8 lg:gap-12">
 
-        <h1 class="text-3xl font-extrabold text-mun-light-text mb-2 text-center">
-            Delegate Login
-        </h1>
-        <p class="text-center text-mun-secondary mb-6 text-base">Access your MUN control panel.</p>
+        <div class="bg-mun-card p-8 md:p-10 rounded-2xl shadow-2xl w-full border-t-4 border-mun-primary mx-auto max-w-sm md:max-w-none">
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="mb-5">
-                    {% for category, message in messages %}
-                        <li class="p-3 mb-2 rounded-lg font-medium text-sm
-                            {% if category == 'error' %} bg-red-800 text-white border-l-4 border-red-500
-                            {% elif category == 'info' %} bg-mun-primary/30 text-mun-light-text border-l-4 border-mun-primary
-                            {% else %} bg-green-800 text-white border-l-4 border-green-500
-                            {% endif %}">
-                            {{ message }}
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+            <h1 class="text-3xl font-extrabold text-mun-light-text mb-2 text-center">
+                Delegate Login
+            </h1>
+            <p class="text-center text-mun-secondary mb-6 text-base">Access your MUN control panel.</p>
 
-        <form method="POST" action="{{ url_for('login') }}">
-            <div class="mb-7">
-                <label for="username" class="block text-sm font-semibold text-mun-light-text mb-2">
-                    Enter Your Delegate ID
-                </label>
-                <input type="text" id="username" name="username" required
-                    class="w-full p-3 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-xl focus:ring-2 focus:ring-mun-primary focus:border-mun-primary transition duration-150 ease-in-out placeholder-gray-400"
-                    placeholder="e.g., UK, FRANCE" autocomplete="off">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <ul class="mb-5">
+                        {% for category, message in messages %}
+                            <li class="p-3 mb-2 rounded-lg font-medium text-sm
+                                {% if category == 'error' %} bg-red-800 text-white border-l-4 border-red-500
+                                {% elif category == 'info' %} bg-mun-primary/30 text-mun-light-text border-l-4 border-mun-primary
+                                {% else %} bg-green-800 text-white border-l-4 border-green-500
+                                {% endif %}">
+                                {{ message }}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('login') }}">
+                <div class="mb-7">
+                    <label for="username" class="block text-sm font-semibold text-mun-light-text mb-2">
+                        Enter Your Delegate ID
+                    </label>
+                    <input type="text" id="username" name="username" required
+                        class="w-full p-3 border-2 border-gray-600 bg-gray-700 text-mun-light-text rounded-xl focus:ring-2 focus:ring-mun-primary focus:border-mun-primary transition duration-150 ease-in-out placeholder-gray-400"
+                        placeholder="e.g., UK, FRANCE" autocomplete="off">
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-mun-primary hover:bg-[#68B7C1] text-mun-dark-bg font-bold tracking-wide py-3 rounded-xl transition duration-300 shadow-md hover:shadow-lg transform active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-mun-primary/50">
+                    Log In
+                </button>
+            </form>
+
+            <p class="mt-8 text-center text-sm text-mun-secondary">
+                For public viewing: <a href="{{ url_for('dashboard') }}" class="text-mun-primary hover:text-mun-light-text font-bold transition duration-150 underline-offset-4 hover:underline">Live Dashboard</a>
+            </p>
+            <p class="mt-4 text-center text-sm text-mun-secondary">
+                For the roster: <a href="{{ url_for('roster') }}" class="text-mun-primary hover:text-mun-light-text font-bold transition duration-150 underline-offset-4 hover:underline">Click here!</a>
+            </p>
+        </div>
+
+        <div class="bg-mun-card p-8 md:p-10 rounded-2xl shadow-2xl w-full mx-auto max-w-sm md:max-w-none md:mt-0">
+            <h2 class="text-2xl font-bold text-mun-light-text mb-4 border-b pb-2 border-mun-primary/50">
+                Important Information
+            </h2>
+
+            <div class="space-y-4">
+                <div class="p-4 bg-gray-700/50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-mun-primary mb-1">
+                        Delegate ID Format
+                    </h3>
+                    <p class="text-mun-secondary text-sm">
+                        Please use the Full Country Name (e.g., `UNITED KINGDOM`, `FRANCE`) for your ID. Do not use abbreviations unless specifically instructed.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-gray-700/50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-mun-primary mb-1">
+                        Technical Support
+                    </h3>
+                    <p class="text-mun-secondary text-sm">
+                        If you are unable to log in, please contact me at <a class="text-mun-primary font-bold hover:underline" href="mailto:ebaldwin.19@wymcol.org">my email</a>. Updates take up to 3 minute to arrive - so if the page has not changed please be patient.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-gray-700/50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-mun-primary mb-1">
+                        Check the Roster
+                    </h3>
+                    <p class="text-mun-secondary text-sm">
+                        Ensure your committee and country are listed correctly on the
+                        <a href="{{ url_for('roster') }}" class="text-mun-primary font-bold hover:underline">Roster Page</a>
+                        before logging in.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-gray-700/50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-mun-primary mb-1">
+                        Please Join the Groupchat
+                    </h3>
+                    <p class="text-mun-secondary text-sm">
+                        It is important that you are either in the groupchat - or have otherwise alerted <a class="text-mun-primary font-bold hover:underline" href="mailto:ebaldwin.19@wymcol.org">me</a> or <a class="text-mun-primary font-bold hover:underline" href="mailto:aabu.19@wymcol.org">Aaron.</a>
+                    </p>
+                </div>
             </div>
 
-            <button type="submit"
-                class="w-full bg-mun-primary hover:bg-[#68B7C1] text-mun-dark-bg font-bold tracking-wide py-3 rounded-xl transition duration-300 shadow-md hover:shadow-lg transform active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-mun-primary/50">
-                Log In
-            </button>
-        </form>
+        </div>
 
-        <p class="mt-8 text-center text-sm text-mun-secondary">
-            For public viewing: <a href="{{ url_for('dashboard') }}" class="text-mun-primary hover:text-mun-light-text font-bold transition duration-150 underline-offset-4 hover:underline">Live Dashboard</a>
-        </p>
-        <p class="mt-8 text-center text-sm text-mun-secondary">
-            For the roster: <a href="{{ url_for('roster') }}" class="text-mun-primary hover:text-mun-light-text font-bold transition duration-150 underline-offset-4 hover:underline">Click here!</a>
-        </p>
     </div>
 
 </body>
