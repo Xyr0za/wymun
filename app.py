@@ -11,8 +11,6 @@ import logging
 import uuid
 import time  # Not strictly used, but kept from original
 
-import json
-
 # Set up basic logging for visibility
 logging.basicConfig(level=logging.INFO)
 
@@ -43,7 +41,6 @@ except FileNotFoundError:
 mun_documents = []
 
 # Tracks the current vote status (global state)
-# CHANGED: 'voters' is now a dictionary to store {delegate_id: vote_choice}
 current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
 current_vote_target_id = None  # ID of the document currently being voted on
 
@@ -64,7 +61,12 @@ def render_stream():
     """
     Renders the current state of the document stream into HTML.
     Applies Tailwind-like classes for visual styling based on document type.
+
+    MODIFIED: Includes 'Strike' button logic for the Admin view.
     """
+    # Check if the current user is an admin (to decide whether to show the Strike button)
+    is_admin_session = session.get('role') == 'admin'
+
     # Using Tailwind-like classes for aesthetics
     html_content = '<div class="space-y-4 font-sans max-w-2xl mx-auto">'
     # Iterate in reverse to show newest items first
@@ -91,18 +93,33 @@ def render_stream():
             bg_class = 'bg-red-50 border-red-500'
 
         # Check if this document is the current vote target
-        if globals().get('current_vote_target_id') == doc.get('id'):
+        is_vote_target = globals().get('current_vote_target_id') == doc.get('id')
+        if is_vote_target:
             vote_status = (
                 '<span class="text-xs font-bold text-red-600 '
                 'bg-red-100 px-2 py-0.5 rounded-full ml-2">VOTING ACTIVE</span>'
             )
 
-        doc_id_display = f'<span class="text-xs text-gray-400 ml-2">ID: {doc.get("id", "N/A")}</span>'
+        # Shortened ID for stream view
+        doc_id_display = f'<span class="text-xs text-gray-400 ml-2">ID: {doc.get("id", "N/A")[:8]}...</span>'
+
+        # NEW: Strike button logic
+        strike_button = ''
+        if is_admin_session and not is_vote_target:
+            strike_button = f"""
+            <button onclick="strikeDocument('{doc.get('id', 'N/A')}')"
+                    class="ml-4 px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white font-semibold rounded transition duration-150">
+                Strike
+            </button>
+            """
 
         # Construct the HTML block for the document
         html_content += f"""
         <div class="p-4 rounded-lg shadow-md {bg_class} {border_color}">
-        <{title_tag} class="text-lg font-bold text-gray-900">{doc['title']}{vote_status}</{title_tag}>
+        <div class="flex justify-between items-start">
+            <{title_tag} class="text-lg font-bold text-gray-900">{doc['title']}{vote_status}</{title_tag}>
+            {strike_button}
+        </div>
         <p class="text-sm text-gray-600 mt-1">
         <span class="font-medium text-gray-900">{doc['delegate']}</span>
         ({doc['type'].replace('_', ' ').title()}) -
@@ -127,7 +144,7 @@ def get_votable_documents():
 def broadcast_stream():
     """
     Emits the updated document stream to all connected clients.
-    Used to update the Dashboard and Admin pages.
+    (Note: Admin/Delegate pages use API polling, this is mainly for the Dashboard).
     """
     stream_html = render_stream()
     socketio.emit('stream_update', {'data': stream_html}, broadcast=True)
@@ -222,6 +239,8 @@ def dashboard():
 @app.route('/stream_content_api')
 def stream_content_api():
     """Returns the raw HTML content of the document stream for AJAX polling."""
+    # This endpoint is primarily for the admin/delegate pages, which check session
+    # before calling the render_stream helper.
     return render_stream()
 
 
@@ -243,7 +262,6 @@ def vote_status_api():
     delegate_id = get_current_user_id()
 
     # Determine if the current delegate has voted
-    # CHANGED: Check in the 'voters' dictionary
     has_voted = delegate_id in current_vote_tally['voters']
 
     return json.dumps({
@@ -300,7 +318,7 @@ def handle_mun_submission(data):
             emit('feedback', {'message': 'No formal vote is currently active.'})
             return
 
-        # CHANGED: Check if the delegate has already voted (in dict keys)
+        # Check if the delegate has already voted (in dict keys)
         if delegate_id in current_vote_tally['voters']:
             emit('feedback', {'message': 'You have already cast your vote.'})
             return
@@ -308,7 +326,7 @@ def handle_mun_submission(data):
         # Process the vote (yay, nay, or abstain)
         if vote in ['yay', 'nay', 'abstain']:
             current_vote_tally[vote] += 1
-            # CHANGED: Store the delegate's vote choice in the dictionary
+            # Store the delegate's vote choice in the dictionary
             current_vote_tally['voters'][delegate_id] = vote
             emit('feedback', {'message': f'Vote recorded: {vote.upper()} on {target_doc["title"]}'})
 
@@ -316,7 +334,6 @@ def handle_mun_submission(data):
             socketio.emit('vote_tally_update', {
                 'target_id': current_vote_target_id,
                 'target_title': target_doc['title'],
-                # Removed individual vote counts to encourage admin to use the API or refresh
                 'voter_count': len(current_vote_tally['voters']),
                 'total_delegates': len(VALID_DELEGATES)
             }, broadcast=True)
@@ -363,7 +380,6 @@ def handle_moderator_action(data):
 
         # Reset and activate the vote state
         current_vote_target_id = target_doc_id
-        # CHANGED: Reset 'voters' to an empty dictionary
         current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
         target_title = target_doc['title']
 
@@ -371,15 +387,10 @@ def handle_moderator_action(data):
         socketio.emit('vote_started', {'target': target_title}, broadcast=True)
         emit('feedback', {'message': f'Formal vote on "{target_title}" started.'})
 
-        # --- NEW LOGIC: MOVE TARGET DOCUMENT TO THE END OF THE LIST (TOP OF STREAM) ---
-        # 1. Temporarily remove the document from its current position
-        # Use slicing assignment to modify the list in place
+        # Logic: Move target document to the end of the list (top of stream)
         mun_documents[:] = [doc for doc in mun_documents if doc.get('id') != target_doc_id]
-
-        # 2. Add it back to the end of the list, updating the timestamp
         target_doc['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         mun_documents.append(target_doc)
-        # -------------------------------------------------------------------
 
         # Add an announcement to the stream *after* the document has been moved
         new_doc = {
@@ -410,16 +421,13 @@ def handle_moderator_action(data):
         nay = current_vote_tally['nay']
         abstain = current_vote_tally['abstain']
         total_votes = yay + nay + abstain
-        # Result logic: Simple majority of Yay vs Nay votes
         result = 'PASSED' if yay > nay else 'FAILED'
 
-        # ADDED: Generate the list of individual delegate votes
-        # Sort by delegate name for consistent display
+        # Generate the list of individual delegate votes
         vote_list_items = [
             f"- {delegate}: {vote.upper()}"
             for delegate, vote in sorted(current_vote_tally['voters'].items())
         ]
-
         vote_list_content = "\n".join(vote_list_items)
 
         # Create the result document
@@ -432,7 +440,7 @@ def handle_moderator_action(data):
             f"Abstain Votes: {abstain}\n"
             f"Total Votes Cast: {total_votes} out of {len(VALID_DELEGATES)} possible votes\n\n"
             f"--- INDIVIDUAL DELEGATE VOTES ---\n"
-            f"{vote_list_content}\n"  # Insert the detailed vote list here
+            f"{vote_list_content}\n"
         )
         new_doc = {
             'id': str(uuid.uuid4()),
@@ -446,7 +454,6 @@ def handle_moderator_action(data):
 
         # Reset the global vote state
         current_vote_target_id = None
-        # CHANGED: Reset 'voters' to an empty dictionary
         current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
 
         # Broadcast the new stream and inform clients the vote is over
@@ -456,11 +463,32 @@ def handle_moderator_action(data):
         emit('feedback', {'message': f'Vote on "{new_doc["title"]}" finalized and published.'})
         emit('admin_state_update', {})  # Trigger an admin page refresh
 
+    # --- Strike Document Action (NEWLY IMPLEMENTED) ---
+    elif action == 'strike_document':
+        doc_id = data.get('doc_id')
+
+        doc_to_strike = get_document_by_id(doc_id)
+
+        if not doc_to_strike:
+            emit('feedback', {'message': f'Document ID {doc_id} not found.'}, broadcast=False)
+            return
+
+        if doc_id == current_vote_target_id:
+            emit('feedback', {'message': 'Cannot strike the document currently under formal vote.'}, broadcast=False)
+            return
+
+        # Filter the list, removing the document with the matching ID
+        mun_documents[:] = [doc for doc in mun_documents if doc.get('id') != doc_id]
+
+        emit('feedback',
+             {'message': f'Document "{doc_to_strike["title"]}" (ID: {doc_id[:8]}...) has been struck from the record.'})
+        broadcast_stream()  # Update the stream for all clients
+        socketio.emit('admin_state_update', broadcast=True)  # Update admin's document lists
+
     # --- Clear Stream Action ---
     elif action == 'clear_stream':
-        mun_documents = []
+        mun_documents[:] = []
         current_vote_target_id = None
-        # CHANGED: Reset 'voters' to an empty dictionary
         current_vote_tally = {'yay': 0, 'nay': 0, 'abstain': 0, 'voters': {}}
 
         # End any active vote and update the stream
@@ -483,6 +511,9 @@ def handle_moderator_action(data):
         mun_documents.append(new_doc)
         broadcast_stream()
         emit('feedback', {'message': 'Announcement posted to the stream.'})
+
+    else:
+        emit('feedback', {'message': 'Unknown moderator action.'})
 
 
 # --- APPLICATION STARTUP ---

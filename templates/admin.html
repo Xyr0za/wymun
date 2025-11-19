@@ -138,7 +138,6 @@
     </main>
 
     <script>
-        // ... (The original JavaScript is inserted here, unchanged)
         const socket = io({
             // Prioritize WebSocket transport
             transports: ['websocket', 'polling'],
@@ -162,7 +161,7 @@
             hideFinalizationControls();
         }
 
-        // --- Polling Logic (NEW) ---
+        // --- Polling Logic ---
 
         function fetchStreamUpdate() {
             // Use Fetch API to get the new stream content from the dedicated API endpoint
@@ -191,15 +190,11 @@
             clearInterval(pollingInterval);
         });
 
-        // (END NEW Polling Logic)
-
-        // --- SocketIO Handlers (MODIFIED) ---
+        // --- SocketIO Handlers ---
 
         socket.on('connect', function() {
             console.log('Connected as Admin.');
         });
-
-        // REMOVED: socket.on('stream_update', ...) - SocketIO no longer handles stream updates here
 
         socket.on('feedback', function(msg) {
             displayFlashMessage(msg.message, 'info');
@@ -209,7 +204,7 @@
         socket.on('vote_tally_update', function(data) {
             // yayCount.textContent = data.yay; // Removed
             // nayCount.textContent = data.nay; // Removed
-            voterCount.textContent = data.voter_count;
+            // voterCount.textContent = data.voter_count; // This variable is not present in admin.html, so commenting out
 
             // Ensure finalization controls are visible if a tally comes in
             if (voteFinalizationControls.classList.contains('hidden')) {
@@ -266,11 +261,18 @@
             }
         }
 
+        // NEW: Function to strike a document
+        function strikeDocument(docId) {
+            if (confirm('Are you SURE you want to strike this document from the record? This action is not reversible.')) {
+                socket.emit('moderator_action', { action: 'strike_document', doc_id: docId });
+            }
+        }
+
         // --- UI Control Functions ---
 
         function resetTallyDisplay() {
             // Only reset the voter count
-            voterCount.textContent = '0';
+            // voterCount.textContent = '0'; // This variable is not present in admin.html, so commenting out
         }
 
         function showFinalizationControls(title) {
@@ -284,7 +286,8 @@
 
         function hideFinalizationControls() {
             voteActiveStatus.className = 'p-4 bg-green-800/50 border-l-4 border-green-500 mb-4';
-            voteActiveStatus.innerHTML = `<p class="font-bold text-green-300">NO VOTE ACTIVE</p>`;
+            voteActiveStatus.innerHTML = `<p class="font-bold text-green-300">NO VOTE ACTIVE</p>
+                `;
 
             voteFinalizationControls.classList.add('hidden');
             startVoteBtn.disabled = false;
